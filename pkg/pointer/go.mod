@@ -1,3 +1,3 @@
-module github.com/mycujoo/go-mcls-stdlib/pkg/pointer
+module github.com/mycujoo/go-stdlib/pkg/pointer
 
 go 1.18
