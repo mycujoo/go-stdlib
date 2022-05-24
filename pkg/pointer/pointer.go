@@ -1,7 +1,7 @@
 package pointer
 
-// To converts from value to the pointer
-func To[V any](v V) *V {
+// From returns pointer to the value
+func From[V any](v V) *V {
 	return &v
 }
 
@@ -15,9 +15,9 @@ func Optional[V comparable](v V) *V {
 	return &v
 }
 
-// From extracts value from the pointer if not nil,
+// Unwrap extracts value from the pointer if not nil,
 // otherwise it returns zero value
-func From[V any](v *V) V {
+func Unwrap[V any](v *V) V {
 	if v == nil {
 		var res V
 		return res
