@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/mycujoo/go-mcls-stdlib/pkg/trace"
+	"github.com/mycujoo/go-stdlib/pkg/trace"
 )
 
 func Example_initTracer() {

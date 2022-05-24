@@ -1,4 +1,4 @@
-module github.com/mycujoo/go-mcls-stdlib/pkg/trace
+module github.com/mycujoo/go-stdlib/pkg/trace
 
 go 1.17
 
