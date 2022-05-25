@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 	"google.golang.org/api/option"
 )
 
@@ -39,6 +39,9 @@ func InitTracer(ctx context.Context, useCloudtrace bool, ratio float64, serviceN
 			semconv.ServiceNameKey.String(serviceName),
 		),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	tp := trace.NewTracerProvider(
 		trace.WithSampler(noHealthCheckSampler{fallback: trace.ParentBased(sampler)}),
