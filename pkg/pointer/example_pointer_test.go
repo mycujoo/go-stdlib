@@ -2,6 +2,7 @@ package pointer_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mycujoo/go-stdlib/pkg/pointer"
 )
@@ -43,6 +44,11 @@ func ExampleOptional() {
 	pstr1 := pointer.Optional(point{1, 2})
 	fmt.Printf("%#v %#v\n", pstr0, pstr1)
 
+	// works for time as well
+	pt0 := pointer.Optional(time.Time{})
+	pt1 := pointer.Optional(time.Date(2022, 5, 22, 0, 0, 0, 0, time.UTC))
+	fmt.Printf("%#v %#v\n", pt0, pt1)
+
 	// Optional won't work for interfaces
 	// var any0 any
 	// any0 = point{}
@@ -51,6 +57,7 @@ func ExampleOptional() {
 	// Output: <nil> 1
 	// <nil> "1"
 	// (*pointer_test.point)(nil) &pointer_test.point{x:1, y:2}
+	// <nil> time.Date(2022, time.May, 22, 0, 0, 0, 0, time.UTC)
 }
 
 func ExampleUnwrap() {
