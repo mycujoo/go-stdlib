@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.8.3
 	go.opentelemetry.io/otel v1.8.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.8.0
 	go.opentelemetry.io/otel/sdk v1.8.0
 	google.golang.org/api v0.90.0
 )

@@ -5,31 +5,21 @@ import (
 
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 	"google.golang.org/api/option"
 )
 
-func InitTracer(ctx context.Context, useCloudtrace bool, ratio float64, serviceName string) (*trace.TracerProvider, error) {
-	var exporter trace.SpanExporter
-	var err error
-	if useCloudtrace {
-		exporter, err = cloudtrace.New(
-			cloudtrace.WithContext(ctx),
-			// we disable telemetry to avoid infinite loop when using OpenCensus bridge
-			// https://github.com/open-telemetry/opentelemetry-go/issues/1928
-			cloudtrace.WithTraceClientOptions([]option.ClientOption{option.WithTelemetryDisabled()}),
-		)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
-		if err != nil {
-			return nil, err
-		}
+func InitCloudTracer(ctx context.Context, ratio float64, serviceName string) (*trace.TracerProvider, error) {
+	exporter, err := cloudtrace.New(
+		cloudtrace.WithContext(ctx),
+		// we disable telemetry to avoid infinite loop when using OpenCensus bridge
+		// https://github.com/open-telemetry/opentelemetry-go/issues/1928
+		cloudtrace.WithTraceClientOptions([]option.ClientOption{option.WithTelemetryDisabled()}),
+	)
+	if err != nil {
+		return nil, err
 	}
 	sampler := trace.TraceIDRatioBased(ratio)
 

@@ -9,7 +9,7 @@ import (
 
 func Example_initTracer() {
 	ctx := context.Background()
-	tp, err := trace.InitTracer(ctx, true, 1.0, "my-service")
+	tp, err := trace.InitCloudTracer(ctx, 1.0, "my-service")
 	if err != nil {
 		log.Fatalf("unable to set up tracing: %v", err)
 	}
