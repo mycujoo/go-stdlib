@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
+	"go.opentelemetry.io/contrib/propagators/autoprop"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -21,6 +22,7 @@ func InitCloudTracer(ctx context.Context, ratio float64, serviceName string) (*t
 	if err != nil {
 		return nil, err
 	}
+
 	sampler := trace.TraceIDRatioBased(ratio)
 
 	res, err := resource.New(ctx,
@@ -40,5 +42,9 @@ func InitCloudTracer(ctx context.Context, ratio float64, serviceName string) (*t
 	)
 
 	otel.SetTracerProvider(tp)
+	// Per otel specification default propagator is no-op.
+	// We use the contrib autoprop package to install some default propagators.
+	// List of propagators can be overridden by setting OTEL_PROPAGATORS environment variable.
+	otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
 	return tp, nil
 }
