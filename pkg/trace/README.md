@@ -3,6 +3,10 @@
 This package contains shared initialization code that exports collected spans to Google
 Cloud Trace.
 
+```bash
+go get "github.com/mycujoo/go-stdlib/pkg/trace"
+```
+
 ## Initialization example:
 ```go
 func main() {
