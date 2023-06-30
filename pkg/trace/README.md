@@ -1,7 +1,6 @@
 # Trace package
 
-This package contains shared initialization code that exports collected spans to Google
-Cloud Trace.
+This package contains shared initialization code that exports collected spans via otlp exporter.
 
 ```bash
 go get "github.com/mycujoo/go-stdlib/pkg/trace"
@@ -11,15 +10,11 @@ go get "github.com/mycujoo/go-stdlib/pkg/trace"
 ```go
 func main() {
 	ctx := context.Background()
-	tp, err := trace.InitTracer(ctx, true, 1.0, "my-service")
+	shutdown, err := trace.Tracing(ctx)
 	if err != nil {
 		log.Fatalf("unable to set up tracing: %v", err)
 	}
-	defer func () {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Fatalf("unable to shutdown tracing: %v", err)
-		}
-	}()
+	defer shutdown()
 }
 ```
 
@@ -34,8 +29,11 @@ import (
 
 func main() {
 	grpcServer := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			otelgrpc.UnaryServerInterceptor(),
+		otelgrpc.UnaryServerInterceptor(
+			otelgrpc.WithInterceptorFilter(func(info *otelgrpc.InterceptorInfo) bool {
+				return !strings.HasPrefix(info.UnaryServerInfo.FullMethod, "/grpc.health.v1.Health")
+			}),
+			otelgrpc.WithMeterProvider(noop.NewMeterProvider()),
 		))
 }
 ```
@@ -49,7 +47,7 @@ import (
 )
 
 // Inside constructor initialize separate instance of tracer 
-tracer:  otel.Tracer("mycujoo.tv/bff-events/postgres")
+tracer:  otel.Tracer("mycujoo.tv/postgres")
 
 func (s *storage) startSpan(ctx context.Context, name string) (context.Context, trace.Span) {
 	spanCtx, span := s.tracer.Start(ctx,
@@ -97,37 +95,30 @@ func (c *consumer) processMessage(ctx context.Context, msg *kafkaavro.Message) {
 	topic := *msg.TopicPartition.Topic
 
 	var span trace.Span
-	if c.tracer != nil {
-		ctx, span = c.tracer.Start(rootCtx,
-			"kafka.process",
-			trace.WithSpanKind(trace.SpanKindConsumer),
-			trace.WithAttributes(
-				semconv.MessagingSystemKey.String("kafka"),
-				semconv.MessagingOperationProcess,
-				semconv.MessagingDestinationKindTopic,
-				semconv.MessagingDestinationKey.String(topic),
-				semconv.MessagingMessageIDKey.String(string(msg.Key)),
-				kafkaPartitionKey.Int(int(msg.TopicPartition.Partition)),
-				kafkaOffsetKey.Int64(int64(msg.TopicPartition.Offset)),
-			),
-		)
-		defer span.End()
-	}
-
+    ctx, span = c.tracer.Start(rootCtx,
+        "kafka.process",
+        trace.WithSpanKind(trace.SpanKindConsumer),
+        trace.WithAttributes(
+            semconv.MessagingSystemKey.String("kafka"),
+            semconv.MessagingOperationProcess,
+            semconv.MessagingDestinationKindTopic,
+            semconv.MessagingDestinationKey.String(topic),
+            semconv.MessagingMessageIDKey.String(string(msg.Key)),
+            kafkaPartitionKey.Int(int(msg.TopicPartition.Partition)),
+            kafkaOffsetKey.Int64(int64(msg.TopicPartition.Offset)),
+        ),
+    )
+    defer span.End()
 
 	err := c.handler.Handle(tctx, msg.Value)
+	span.RecordError(err)
 	if err != nil {
-		if c.tracer != nil {
-			span.RecordError(err)
-		}
 		// log error, handle, etc
 		return
 	}
 
 	if _, err = c.consumer.CommitMessage(msg.Message); err != nil {
-		if c.tracer != nil {
-			span.RecordError(err)
-		}
+        span.RecordError(err)
 		// log, handle error
 	}
 }
