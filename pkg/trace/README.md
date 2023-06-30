@@ -7,6 +7,31 @@ go get "github.com/mycujoo/go-stdlib/pkg/trace"
 ```
 
 ## Initialization example:
+Kubernetes deployment example:
+```yaml
+env:
+ - name: POD_NAME
+   valueFrom:
+     fieldRef:
+       fieldPath: metadata.name
+ - name: NAMESPACE_NAME
+   valueFrom:
+     fieldRef:
+       fieldPath: metadata.namespace
+ - name: CONTAINER_NAME
+   value: my-container-name
+ - name: OTEL_RESOURCE_ATTRIBUTES
+   value: k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(NAMESPACE_NAME),k8s.container.name=$(CONTAINER_NAME),SampleRate=10
+ - name: OTEL_SERVICE_NAME
+   value: my-service-name
+ - name: OTEL_TRACES_SAMPLER
+   value: parentbased_traceidratio
+ - name: OTEL_TRACES_SAMPLER_ARG
+   value: 0.1 # value must match with SampleRate attribute
+ - name: OTEL_EXPORTER_OTLP_ENDPOINT
+   value: http://opentelemetry-collector.monitoring.svc.cluster.local.:4317
+```
+main.go:
 ```go
 func main() {
 	ctx := context.Background()
