@@ -1,6 +1,6 @@
 module github.com/mycujoo/go-stdlib/pkg/trace
 
-go 1.20
+go 1.18
 
 require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.17.0
