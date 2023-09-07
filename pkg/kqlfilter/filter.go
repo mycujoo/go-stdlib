@@ -2,29 +2,30 @@ package kqlfilter
 
 import "fmt"
 
-type SimpleFilter struct {
-	Clauses []SimpleClause
+type Filter struct {
+	Clauses []Clause
 }
 
-type SimpleClause struct {
+type Clause struct {
 	Field string
 	Value string
 }
 
-// ParseSimpleFilter parses a simple filter string into a SimpleFilter struct.
+// Parse parses a filter string into a Filter struct.
 // The filter string must not contain any boolean operators, parentheses or nested queries.
 // The filter string must contain only simple clauses of the form "field:value".
-func ParseSimpleFilter(input string) (SimpleFilter, error) {
-	ast, err := Parse(input, DisableComplexExpressions())
+// If you need to parse a more complex filter string, use ParseAST instead.
+func Parse(input string) (Filter, error) {
+	ast, err := ParseAST(input, DisableComplexExpressions())
 	if err != nil {
-		return SimpleFilter{}, err
+		return Filter{}, err
 	}
 	return convertToSimpleFilter(ast)
 }
 
-// Parse parses a filter string into an AST.
+// ParseAST parses a filter string into an AST.
 // The filter string must be a valid Kibana query language filter string.
-func Parse(input string, options ...ParserOption) (n Node, err error) {
+func ParseAST(input string, options ...ParserOption) (n Node, err error) {
 	p := &parser{}
 	for _, option := range options {
 		option(p)
@@ -49,9 +50,9 @@ func DisableComplexExpressions() ParserOption {
 	}
 }
 
-func convertToSimpleFilter(ast Node) (SimpleFilter, error) {
+func convertToSimpleFilter(ast Node) (Filter, error) {
 	if ast == nil {
-		return SimpleFilter{}, nil
+		return Filter{}, nil
 	}
 	switch n := ast.(type) {
 	case *AndNode:
@@ -59,36 +60,36 @@ func convertToSimpleFilter(ast Node) (SimpleFilter, error) {
 	case *IsNode:
 		return convertIsNode(n)
 	default:
-		return SimpleFilter{}, fmt.Errorf("unsupported node type %T", ast)
+		return Filter{}, fmt.Errorf("unsupported node type %T", ast)
 	}
 }
 
-func convertAndNode(ast *AndNode) (SimpleFilter, error) {
-	var filter SimpleFilter
+func convertAndNode(ast *AndNode) (Filter, error) {
+	var filter Filter
 	for _, node := range ast.Nodes {
 		isNode, ok := node.(*IsNode)
 		if !ok {
-			return SimpleFilter{}, fmt.Errorf("unsupported node type %T", node)
+			return Filter{}, fmt.Errorf("unsupported node type %T", node)
 		}
 		f, err := convertIsNode(isNode)
 		if err != nil {
-			return SimpleFilter{}, err
+			return Filter{}, err
 		}
 		filter.Clauses = append(filter.Clauses, f.Clauses...)
 	}
 	return filter, nil
 }
 
-func convertIsNode(ast *IsNode) (SimpleFilter, error) {
+func convertIsNode(ast *IsNode) (Filter, error) {
 	var value string
 	switch n := ast.Value.(type) {
 	case *LiteralNode:
 		value = n.Value
 	default:
-		return SimpleFilter{}, fmt.Errorf("unsupported node type %T", ast.Value)
+		return Filter{}, fmt.Errorf("unsupported node type %T", ast.Value)
 	}
-	return SimpleFilter{
-		Clauses: []SimpleClause{
+	return Filter{
+		Clauses: []Clause{
 			{
 				Field: ast.Identifier,
 				Value: value,

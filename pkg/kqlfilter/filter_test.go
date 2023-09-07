@@ -7,20 +7,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseSimpleFilter(t *testing.T) {
+func TestParse(t *testing.T) {
 	// All of those should return an error.
 	testCases := []struct {
 		name          string
 		input         string
 		expectedError bool
-		expected      SimpleFilter
+		expected      Filter
 	}{
 		{
 			"one field",
 			"field:value",
 			false,
-			SimpleFilter{
-				Clauses: []SimpleClause{
+			Filter{
+				Clauses: []Clause{
 					{
 						Field: "field",
 						Value: "value",
@@ -32,8 +32,8 @@ func TestParseSimpleFilter(t *testing.T) {
 			"two fields",
 			"field:value another:second",
 			false,
-			SimpleFilter{
-				Clauses: []SimpleClause{
+			Filter{
+				Clauses: []Clause{
 					{
 						Field: "field",
 						Value: "value",
@@ -49,19 +49,19 @@ func TestParseSimpleFilter(t *testing.T) {
 			"or is not supported",
 			"field:value OR another:second",
 			true,
-			SimpleFilter{},
+			Filter{},
 		},
 		{
 			"or values not supported",
 			"field:(value OR second)",
 			true,
-			SimpleFilter{},
+			Filter{},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			f, err := ParseSimpleFilter(test.input)
+			f, err := Parse(test.input)
 			if test.expectedError {
 				require.Error(t, err)
 				return

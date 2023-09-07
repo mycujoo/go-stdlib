@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParse(t *testing.T) {
+func TestParseAST(t *testing.T) {
 	testCases := []struct {
 		name          string
 		input         string
@@ -162,7 +162,7 @@ func TestParse(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			n, err := Parse(test.input)
+			n, err := ParseAST(test.input)
 			if test.expectedError {
 				require.Error(t, err, "expected error, got none")
 			} else {
@@ -199,7 +199,7 @@ func TestParseSimple(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := Parse(test.input, DisableComplexExpressions())
+			_, err := ParseAST(test.input, DisableComplexExpressions())
 			require.Error(t, err)
 		})
 	}
