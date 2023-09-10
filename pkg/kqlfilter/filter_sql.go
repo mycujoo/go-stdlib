@@ -11,6 +11,7 @@ const (
 	FilterSQLAllowedFieldsItemInt
 	FilterSQLAllowedFieldsItemDouble
 	FilterSQLAllowedFieldsItemBool
+	FilterSQLAllowedFieldsItemDateTime
 )
 
 type FilterSQLAllowedFieldsItem struct {
@@ -23,7 +24,7 @@ type FilterSQLAllowedFieldsItem struct {
 	AllowPrefixMatch bool
 }
 
-// toStandardSQL turns a Filter into a partial SQL statement. It takes a map of columns that are allowed to be queried via this
+// toSQL turns a Filter into a partial SQL statement. It takes a map of columns that are allowed to be queried via this
 // filter. It returns a SQL clause that can be added to a WHERE clause, along with associated params.
 // An example follows.
 //
@@ -48,7 +49,9 @@ type FilterSQLAllowedFieldsItem struct {
 //		"@GeneratedPlaceholder0": 12345,
 //		"@GeneratedPlaceholder1": "@example.com"
 //	}
-func (f Filter) toStandardSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
+//
+// Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
+func (f Filter) toSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
 	var condAnds []string
 	params := map[string]any{}
 
@@ -63,11 +66,11 @@ func (f Filter) toStandardSQL(allowedFields map[string]FilterSQLAllowedFieldsIte
 			case FilterSQLAllowedFieldsItemString:
 				if cmv.AllowPrefixMatch && strings.HasSuffix(clause.Value, "*") {
 					// TODO: Handle escaped asterisk (*) characters that should not serve as wildcards
-					condAnds = append(condAnds, columnName+" LIKE @"+placeholderName)
+					condAnds = append(condAnds, fmt.Sprintf("%s LIKE @%s", columnName, placeholderName))
 					escapedValue := strings.ReplaceAll(clause.Value, "%", "\\%")
 					params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
 				} else {
-					condAnds = append(condAnds, columnName+" = @"+placeholderName)
+					condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
 					params[placeholderName] = clause.Value
 				}
 			case FilterSQLAllowedFieldsItemInt:
@@ -75,19 +78,23 @@ func (f Filter) toStandardSQL(allowedFields map[string]FilterSQLAllowedFieldsIte
 				if err != nil {
 					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
-				condAnds = append(condAnds, columnName+" = @"+placeholderName)
+				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = intVal
 			case FilterSQLAllowedFieldsItemDouble:
 				doubleVal, err := strconv.ParseFloat(clause.Value, 64)
 				if err != nil {
 					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
-				condAnds = append(condAnds, columnName+" = @"+placeholderName)
+				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = doubleVal
 			case FilterSQLAllowedFieldsItemBool:
 				boolVal, _ := strconv.ParseBool(clause.Value)
-				condAnds = append(condAnds, columnName+" IS @"+placeholderName)
+				condAnds = append(condAnds, fmt.Sprintf("%s IS @%s", columnName, placeholderName))
 				params[placeholderName] = boolVal
+			case FilterSQLAllowedFieldsItemDateTime:
+				// Should we validate that this string is actually a datetime?
+				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
+				params[placeholderName] = clause.Value
 			}
 		} else {
 			return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)

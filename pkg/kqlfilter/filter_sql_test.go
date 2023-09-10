@@ -12,6 +12,7 @@ func TestToSQL(t *testing.T) {
 	testCases := []struct {
 		name           string
 		input          string
+		withRanges     bool
 		columnMap      map[string]FilterSQLAllowedFieldsItem
 		expectedError  bool
 		expectedClause string
@@ -20,6 +21,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"one integer field",
 			"userId:12345",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "user_id",
@@ -27,7 +29,7 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(user_id = @GeneratedPlaceholder0)",
+			"(user_id=@GeneratedPlaceholder0)",
 			map[string]any{
 				"GeneratedPlaceholder0": 12345,
 			},
@@ -35,6 +37,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"one integer field and one string field",
 			"userId:12345 email:johnexamplecom",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
@@ -45,7 +48,7 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id = @GeneratedPlaceholder0 AND email = @GeneratedPlaceholder1)",
+			"(u.user_id=@GeneratedPlaceholder0 AND email=@GeneratedPlaceholder1)",
 			map[string]any{
 				"GeneratedPlaceholder0": 12345,
 				"GeneratedPlaceholder1": "johnexamplecom",
@@ -54,6 +57,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"one integer field and one string field with no partial matching allowed",
 			"userId:12345 email:*examplecom",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
@@ -64,7 +68,7 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id = @GeneratedPlaceholder0 AND email = @GeneratedPlaceholder1)",
+			"(u.user_id=@GeneratedPlaceholder0 AND email=@GeneratedPlaceholder1)",
 			map[string]any{
 				"GeneratedPlaceholder0": 12345,
 				"GeneratedPlaceholder1": "*examplecom",
@@ -73,6 +77,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"one integer field and one string field with prefix matching allowed",
 			"userId:12345 email:johnexample*",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
@@ -84,7 +89,7 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id = @GeneratedPlaceholder0 AND email LIKE @GeneratedPlaceholder1)",
+			"(u.user_id=@GeneratedPlaceholder0 AND email LIKE @GeneratedPlaceholder1)",
 			map[string]any{
 				"GeneratedPlaceholder0": 12345,
 				"GeneratedPlaceholder1": "johnexample%",
@@ -94,6 +99,7 @@ func TestToSQL(t *testing.T) {
 		//{
 		//	"escape percentage sign with wildcard suffix allowed",
 		//	"discount_string:70%*",
+		//  false,
 		//	map[string]FilterSQLAllowedFieldsItem{
 		//		"email": {
 		//			ColumnType:       FilterSQLAllowedFieldsItemString,
@@ -110,6 +116,7 @@ func TestToSQL(t *testing.T) {
 		//{
 		//	"one integer field and one string field with wildcards allowed, illegal wildcard in middle",
 		//	"userId:12345 email:*example*com",
+		//  false,
 		//	map[string]FilterSQLAllowedFieldsItem{
 		//		"userId": FilterSQLAllowedFieldsItem{
 		//			ColumnName: "u.user_id",
@@ -121,7 +128,7 @@ func TestToSQL(t *testing.T) {
 		//		},
 		//	},
 		//  false,
-		//	"(u.user_id = @GeneratedPlaceholder0)",
+		//	"(u.user_id=@GeneratedPlaceholder0)",
 		//	map[string]any{
 		//		"GeneratedPlaceholder0": 12345,
 		//	},
@@ -129,6 +136,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"disallowed column",
 			"userId:12345 password:qwertyuiop",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
@@ -142,13 +150,14 @@ func TestToSQL(t *testing.T) {
 		{
 			"double columns and bool",
 			"lat:52.4052963 lon:4.8856547 exact:false",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"lat":   {ColumnType: FilterSQLAllowedFieldsItemDouble},
 				"lon":   {ColumnType: FilterSQLAllowedFieldsItemDouble},
 				"exact": {ColumnType: FilterSQLAllowedFieldsItemBool},
 			},
 			false,
-			"(lat = @GeneratedPlaceholder0 AND lon = @GeneratedPlaceholder1 AND exact IS @GeneratedPlaceholder2)",
+			"(lat=@GeneratedPlaceholder0 AND lon=@GeneratedPlaceholder1 AND exact IS @GeneratedPlaceholder2)",
 			map[string]any{
 				"GeneratedPlaceholder0": 52.4052963,
 				"GeneratedPlaceholder1": 4.8856547,
@@ -158,6 +167,7 @@ func TestToSQL(t *testing.T) {
 		{
 			"fuzzy booleans",
 			"truthy:1 falsey:0 also_truthy:t",
+			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"truthy": {ColumnType: FilterSQLAllowedFieldsItemBool},
 				"falsey": {ColumnType: FilterSQLAllowedFieldsItemBool},
@@ -174,13 +184,34 @@ func TestToSQL(t *testing.T) {
 				"GeneratedPlaceholder2": true,
 			},
 		},
+		{
+			"all four range operators",
+			"userId>=12345 lat<50.0 lon>4.1 date<=\"2023-06-01 23:00:00\"",
+			true,
+			map[string]FilterSQLAllowedFieldsItem{
+				"userId": {
+					ColumnName: "user_id",
+					ColumnType: FilterSQLAllowedFieldsItemInt,
+				},
+				"lat":  {ColumnType: FilterSQLAllowedFieldsItemDouble},
+				"lon":  {ColumnType: FilterSQLAllowedFieldsItemDouble},
+				"date": {ColumnType: FilterSQLAllowedFieldsItemDateTime},
+			},
+			false,
+			"(user_id>=@GeneratedPlaceholder0 AND lat<@GeneratedPlaceholder1 AND lon>@GeneratedPlaceholder2 AND date<=@GeneratedPlaceholder3)",
+			map[string]any{
+				"GeneratedPlaceholder0": 12345,
+				"GeneratedPlaceholder1": 50.0,
+				"GeneratedPlaceholder2": 4.1,
+				"GeneratedPlaceholder3": "2023-06-01 23:00:00",
+			},
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			f, err := Parse(test.input)
-			require.NoError(t, err)
-			clause, params, err := f.toStandardSQL(test.columnMap)
+			f, err := Parse(test.input, test.withRanges)
+			clause, params, err := f.toSQL(test.columnMap)
 			if test.expectedError {
 				require.Error(t, err)
 				return

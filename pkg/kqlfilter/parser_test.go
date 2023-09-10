@@ -180,10 +180,6 @@ func TestParseSimple(t *testing.T) {
 		input string
 	}{
 		{
-			"boolean",
-			"field:value AND second:filter",
-		},
-		{
 			"boolean 2",
 			"field:value OR second:filter",
 		},

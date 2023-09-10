@@ -12,6 +12,7 @@ func TestParse(t *testing.T) {
 	testCases := []struct {
 		name          string
 		input         string
+		withRanges    bool
 		expectedError bool
 		expected      Filter
 	}{
@@ -19,11 +20,13 @@ func TestParse(t *testing.T) {
 			"one field",
 			"field:value",
 			false,
+			false,
 			Filter{
 				Clauses: []Clause{
 					{
-						Field: "field",
-						Value: "value",
+						Field:    "field",
+						Operator: "=",
+						Value:    "value",
 					},
 				},
 			},
@@ -32,15 +35,38 @@ func TestParse(t *testing.T) {
 			"two fields",
 			"field:value another:second",
 			false,
+			false,
 			Filter{
 				Clauses: []Clause{
 					{
-						Field: "field",
-						Value: "value",
+						Field:    "field",
+						Operator: "=",
+						Value:    "value",
 					},
 					{
-						Field: "another",
-						Value: "second",
+						Field:    "another",
+						Operator: "=",
+						Value:    "second",
+					},
+				},
+			},
+		},
+		{
+			"two fields with and",
+			"field:value and another:second",
+			false,
+			false,
+			Filter{
+				Clauses: []Clause{
+					{
+						Field:    "field",
+						Operator: "=",
+						Value:    "value",
+					},
+					{
+						Field:    "another",
+						Operator: "=",
+						Value:    "second",
 					},
 				},
 			},
@@ -48,12 +74,36 @@ func TestParse(t *testing.T) {
 		{
 			"or is not supported",
 			"field:value OR another:second",
+			false,
 			true,
 			Filter{},
 		},
 		{
 			"or values not supported",
 			"field:(value OR second)",
+			false,
+			true,
+			Filter{},
+		},
+		{
+			"one field with range operator",
+			"field>=value",
+			true,
+			false,
+			Filter{
+				Clauses: []Clause{
+					{
+						Field:    "field",
+						Operator: ">=",
+						Value:    "value",
+					},
+				},
+			},
+		},
+		{
+			"one field with illegal range operator",
+			"field>=value",
+			false,
 			true,
 			Filter{},
 		},
@@ -61,7 +111,7 @@ func TestParse(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			f, err := Parse(test.input)
+			f, err := Parse(test.input, test.withRanges)
 			if test.expectedError {
 				require.Error(t, err)
 				return
