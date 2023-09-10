@@ -131,13 +131,4 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 	}
 
 	return condAnds, params, nil
-
-}
-
-func SliceMap[T any, U any](in []T, f func(T) U) []U {
-	out := make([]U, len(in))
-	for i, item := range in {
-		out[i] = f(item)
-	}
-	return out
 }
