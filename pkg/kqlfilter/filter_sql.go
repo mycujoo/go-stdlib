@@ -87,7 +87,11 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 					for _, v := range cmv.AllowedValues {
 						if v.InputValue == clause.Value {
 							condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
-							params[placeholderName] = v.ColumnValue
+							coalescedValue := v.ColumnValue
+							if coalescedValue == "" {
+								coalescedValue = v.InputValue
+							}
+							params[placeholderName] = coalescedValue
 							found = true
 							break
 						}
