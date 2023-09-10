@@ -163,6 +163,25 @@ func TestToSQL(t *testing.T) {
 			map[string]any{},
 		},
 		{
+			"allowed field value with implicit column value",
+			"state:active",
+			false,
+			map[string]FilterSQLAllowedFieldsItem{
+				"state": {
+					AllowedValues: []FilterSQLAllowedFieldsItemAllowedValue{
+						{InputValue: "active"},
+						{InputValue: "canceled"},
+						{InputValue: "expired"},
+					},
+				},
+			},
+			false,
+			"(state=@GeneratedPlaceholder0)",
+			map[string]any{
+				"GeneratedPlaceholder0": "active",
+			},
+		},
+		{
 			"allowed field value with input and column values differing",
 			"state:payment_state_active",
 			false,
