@@ -2,6 +2,7 @@ package kqlfilter
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,7 +187,7 @@ func TestToSQL(t *testing.T) {
 		},
 		{
 			"all four range operators",
-			"userId>=12345 lat<50.0 lon>4.1 date<=\"2023-06-01 23:00:00\"",
+			"userId>=12345 lat<50.0 lon>4.1 date<=\"2023-06-01T23:00:00.20Z\"",
 			true,
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
@@ -203,7 +204,7 @@ func TestToSQL(t *testing.T) {
 				"GeneratedPlaceholder0": 12345,
 				"GeneratedPlaceholder1": 50.0,
 				"GeneratedPlaceholder2": 4.1,
-				"GeneratedPlaceholder3": "2023-06-01 23:00:00",
+				"GeneratedPlaceholder3": time.Date(2023, time.June, 1, 23, 0, 0, 200000000, time.UTC),
 			},
 		},
 	}
