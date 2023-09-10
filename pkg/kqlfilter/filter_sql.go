@@ -24,13 +24,13 @@ type FilterSQLAllowedFieldsItem struct {
 	AllowPrefixMatch bool
 }
 
-// toSQL turns a Filter into a partial SQL statement. It takes a map of columns that are allowed to be queried via this
-// filter. It returns a SQL clause that can be added to a WHERE clause, along with associated params.
-// An example follows.
+// toSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
+// filter (as a user should not be able to query all db columns via a filter). It returns a partial SQL statement that
+// can be added to a WHERE clause, along with associated params. An example follows.
 //
 // Given a Filter that looks like this:
 //
-//	[(Field: "userId", Value: "12345"), (Field: "email", Value: "*@example.com")]
+//	[(Field: "userId", Operator: "=", Value: "12345"), (Field: "email", Operator: "=", Value: "john@example.*")]
 //
 // and an allowedFields that looks like this:
 //
@@ -39,15 +39,15 @@ type FilterSQLAllowedFieldsItem struct {
 //		"email":  (ColumnName: "email",   ColumnType: FilterColumnMapValueString, AllowPartialMatch: true)
 //	}
 //
-// This returns a (partial) WHERE clause:
+// This returns a partial SQL statement that can be appended to an existing WHERE clause:
 //
-//	(user_id=@GeneratedPlaceholder0 AND email LIKE %@GeneratedPlaceholder1)
+//	(user_id=@GeneratedPlaceholder0 AND email LIKE @GeneratedPlaceholder1)
 //
 // and params:
 //
 //	{
 //		"@GeneratedPlaceholder0": 12345,
-//		"@GeneratedPlaceholder1": "@example.com"
+//		"@GeneratedPlaceholder1": "john@example.%"
 //	}
 //
 // Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
