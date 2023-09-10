@@ -1,6 +1,7 @@
 package kqlfilter
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ func TestToSQL(t *testing.T) {
 		withRanges     bool
 		columnMap      map[string]FilterSQLAllowedFieldsItem
 		expectedError  bool
-		expectedClause string
+		expectedSQL    string
 		expectedParams map[string]any
 	}{
 		{
@@ -212,12 +213,17 @@ func TestToSQL(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			f, err := Parse(test.input, test.withRanges)
-			clause, params, err := f.ToSQL(test.columnMap)
+			condAnds, params, err := f.ToSQL(test.columnMap)
 			if test.expectedError {
 				require.Error(t, err)
 				return
 			}
-			assert.Equal(t, test.expectedClause, clause)
+
+			sql := ""
+			if len(condAnds) > 0 {
+				sql = "(" + strings.Join(condAnds, " AND ") + ")"
+			}
+			assert.Equal(t, test.expectedSQL, sql)
 			assert.Equal(t, test.expectedParams, params)
 		})
 	}
