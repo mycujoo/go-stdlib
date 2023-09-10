@@ -2,6 +2,7 @@ package kqlfilter
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,9 @@ type FilterSQLAllowedFieldsItem struct {
 	// Allow prefix matching when a wildcard (`*`) is present at the end of a string.
 	// Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to false.
 	AllowPrefixMatch bool
+	// The values that the user is allowed to use in the query. Typically used for enums. Does not work in combination
+	// with prefix matching. Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to allowing any value.
+	AllowedValues []string
 }
 
 // ToSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
@@ -73,6 +77,9 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 					escapedValue := strings.ReplaceAll(clause.Value, "%", "\\%")
 					params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
 				} else {
+					if len(cmv.AllowedValues) > 0 && !slices.Contains(cmv.AllowedValues, clause.Value) {
+						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+					}
 					condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
 					params[placeholderName] = clause.Value
 				}
