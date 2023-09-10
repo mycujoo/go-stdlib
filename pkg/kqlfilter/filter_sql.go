@@ -40,9 +40,9 @@ type FilterSQLAllowedFieldsItem struct {
 //		"email":  (ColumnName: "email",   ColumnType: FilterColumnMapValueString, AllowPartialMatch: true)
 //	}
 //
-// This returns a partial SQL statement that can be appended to an existing WHERE clause:
+// This returns a slice of SQL conditions that can be appended to an existing WHERE clause (make sure to AND these first):
 //
-//	(user_id=@GeneratedPlaceholder0 AND email LIKE @GeneratedPlaceholder1)
+//	["user_id=@GeneratedPlaceholder0", "email LIKE @GeneratedPlaceholder1"]
 //
 // and params:
 //
@@ -52,9 +52,9 @@ type FilterSQLAllowedFieldsItem struct {
 //	}
 //
 // Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
-func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
+func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]string, map[string]interface{}, error) {
 	var condAnds []string
-	params := map[string]any{}
+	params := map[string]interface{}{}
 
 	for i, clause := range f.Clauses {
 		if cmv, ok := allowedFields[clause.Field]; ok {
@@ -77,14 +77,14 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (stri
 			case FilterSQLAllowedFieldsItemInt:
 				intVal, err := strconv.Atoi(clause.Value)
 				if err != nil {
-					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = intVal
 			case FilterSQLAllowedFieldsItemDouble:
 				doubleVal, err := strconv.ParseFloat(clause.Value, 64)
 				if err != nil {
-					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = doubleVal
@@ -95,19 +95,16 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (stri
 			case FilterSQLAllowedFieldsItemDateTime:
 				t, err := time.Parse(time.RFC3339, clause.Value)
 				if err != nil {
-					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = t
 			}
 		} else {
-			return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+			return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 		}
 	}
 
-	if len(condAnds) == 0 {
-		return "", params, nil
-	}
-	sql := "(" + strings.Join(condAnds, " AND ") + ")"
-	return sql, params, nil
+	return condAnds, params, nil
+
 }
