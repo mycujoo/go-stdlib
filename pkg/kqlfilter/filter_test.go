@@ -107,6 +107,26 @@ func TestParse(t *testing.T) {
 			true,
 			Filter{},
 		},
+		{
+			"one field repeated to create a range",
+			"amount>=1 and amount<5",
+			true,
+			false,
+			Filter{
+				Clauses: []Clause{
+					{
+						Field:    "amount",
+						Operator: ">=",
+						Value:    "1",
+					},
+					{
+						Field:    "amount",
+						Operator: "<",
+						Value:    "5",
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range testCases {
