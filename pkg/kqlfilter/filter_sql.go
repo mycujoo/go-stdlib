@@ -2,7 +2,6 @@ package kqlfilter
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +27,14 @@ type FilterSQLAllowedFieldsItem struct {
 	AllowPrefixMatch bool
 	// The values that the user is allowed to use in the query. Typically used for enums. Does not work in combination
 	// with prefix matching. Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to allowing any value.
-	AllowedValues []string
+	AllowedValues []FilterSQLAllowedFieldsItemAllowedValue
+}
+
+type FilterSQLAllowedFieldsItemAllowedValue struct {
+	// The value that the user provides in the filter
+	InputValue string
+	// The value as it is stored in the database table. Defaults to the InputValue.
+	ColumnValue string
 }
 
 // ToSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
@@ -76,10 +82,20 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 					condAnds = append(condAnds, fmt.Sprintf("%s LIKE @%s", columnName, placeholderName))
 					escapedValue := strings.ReplaceAll(clause.Value, "%", "\\%")
 					params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
-				} else {
-					if len(cmv.AllowedValues) > 0 && !slices.Contains(cmv.AllowedValues, clause.Value) {
+				} else if len(cmv.AllowedValues) > 0 {
+					found := false
+					for _, v := range cmv.AllowedValues {
+						if v.InputValue == clause.Value {
+							condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
+							params[placeholderName] = v.ColumnValue
+							found = true
+							break
+						}
+					}
+					if !found {
 						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 					}
+				} else {
 					condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
 					params[placeholderName] = clause.Value
 				}
@@ -116,4 +132,12 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 
 	return condAnds, params, nil
 
+}
+
+func SliceMap[T any, U any](in []T, f func(T) U) []U {
+	out := make([]U, len(in))
+	for i, item := range in {
+		out[i] = f(item)
+	}
+	return out
 }
