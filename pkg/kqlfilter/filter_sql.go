@@ -7,21 +7,23 @@ import (
 	"time"
 )
 
+type FilterSQLAllowedFieldsColumnType int
+
 const (
-	FilterSQLAllowedFieldsItemString = iota
-	FilterSQLAllowedFieldsItemInt
-	FilterSQLAllowedFieldsItemDouble
-	FilterSQLAllowedFieldsItemBool
-	FilterSQLAllowedFieldsItemDateTime
+	FilterSQLAllowedFieldsColumnTypeString = iota
+	FilterSQLAllowedFieldsColumnTypeInt
+	FilterSQLAllowedFieldsColumnTypeDouble
+	FilterSQLAllowedFieldsColumnTypeBool
+	FilterSQLAllowedFieldsColumnTypeDateTime
 )
 
 type FilterSQLAllowedFieldsItem struct {
-	// SQL table column name. Can be omitted if the column name is equal to the key in the column map
+	// SQL table column name. Can be omitted if the column name is equal to the key in the allowedFields map.
 	ColumnName string
-	// SQL column type
-	ColumnType int
+	// SQL column type. Defaults to FilterSQLAllowedFieldsColumnTypeString.
+	ColumnType FilterSQLAllowedFieldsColumnType
 	// Allow prefix matching when a wildcard (`*`) is present at the end of a string.
-	// Only applicable for FilterSQLAllowedFieldsItemString
+	// Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to false.
 	AllowPrefixMatch bool
 }
 
@@ -36,8 +38,8 @@ type FilterSQLAllowedFieldsItem struct {
 // and an allowedFields that looks like this:
 //
 //	{
-//		"userId": (ColumnName: "user_id", ColumnType: FilterColumnMapValueInt,    AllowPartialMatch: false),
-//		"email":  (ColumnName: "email",   ColumnType: FilterColumnMapValueString, AllowPartialMatch: true)
+//		"userId": (ColumnName: "user_id", ColumnType: FilterSQLAllowedFieldsColumnTypeInt,    AllowPartialMatch: false),
+//		"email":  (ColumnName: "email",   ColumnType: FilterSQLAllowedFieldsColumnTypeString, AllowPartialMatch: true)
 //	}
 //
 // This returns a slice of SQL conditions that can be appended to an existing WHERE clause (make sure to AND these first):
@@ -64,7 +66,7 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 			}
 			placeholderName := fmt.Sprintf("%s%d", "GeneratedPlaceholder", i)
 			switch cmv.ColumnType {
-			case FilterSQLAllowedFieldsItemString:
+			case FilterSQLAllowedFieldsColumnTypeString:
 				if cmv.AllowPrefixMatch && strings.HasSuffix(clause.Value, "*") {
 					// TODO: Handle escaped asterisk (*) characters that should not serve as wildcards
 					condAnds = append(condAnds, fmt.Sprintf("%s LIKE @%s", columnName, placeholderName))
@@ -74,25 +76,25 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 					condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
 					params[placeholderName] = clause.Value
 				}
-			case FilterSQLAllowedFieldsItemInt:
+			case FilterSQLAllowedFieldsColumnTypeInt:
 				intVal, err := strconv.Atoi(clause.Value)
 				if err != nil {
 					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = intVal
-			case FilterSQLAllowedFieldsItemDouble:
+			case FilterSQLAllowedFieldsColumnTypeDouble:
 				doubleVal, err := strconv.ParseFloat(clause.Value, 64)
 				if err != nil {
 					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
 				params[placeholderName] = doubleVal
-			case FilterSQLAllowedFieldsItemBool:
+			case FilterSQLAllowedFieldsColumnTypeBool:
 				boolVal, _ := strconv.ParseBool(clause.Value)
 				condAnds = append(condAnds, fmt.Sprintf("%s IS @%s", columnName, placeholderName))
 				params[placeholderName] = boolVal
-			case FilterSQLAllowedFieldsItemDateTime:
+			case FilterSQLAllowedFieldsColumnTypeDateTime:
 				t, err := time.Parse(time.RFC3339, clause.Value)
 				if err != nil {
 					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)

@@ -27,7 +27,7 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
 			},
 			false,
@@ -43,10 +43,10 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
 				"email": {
-					ColumnType: FilterSQLAllowedFieldsItemString,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeString,
 				},
 			},
 			false,
@@ -63,10 +63,10 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
 				"email": {
-					ColumnType: FilterSQLAllowedFieldsItemString,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeString,
 				},
 			},
 			false,
@@ -83,10 +83,10 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
 				"email": {
-					ColumnType:       FilterSQLAllowedFieldsItemString,
+					ColumnType:       FilterSQLAllowedFieldsColumnTypeString,
 					AllowPrefixMatch: true,
 				},
 			},
@@ -104,7 +104,7 @@ func TestToSQL(t *testing.T) {
 		//  false,
 		//	map[string]FilterSQLAllowedFieldsItem{
 		//		"email": {
-		//			ColumnType:       FilterSQLAllowedFieldsItemString,
+		//			ColumnType:       FilterSQLAllowedFieldsColumnTypeString,
 		//			AllowPrefixMatch: true,
 		//		},
 		//	},
@@ -122,10 +122,10 @@ func TestToSQL(t *testing.T) {
 		//	map[string]FilterSQLAllowedFieldsItem{
 		//		"userId": FilterSQLAllowedFieldsItem{
 		//			ColumnName: "u.user_id",
-		//			ColumnType: FilterSQLAllowedFieldsItemInt,
+		//			ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 		//		},
 		//		"email": FilterSQLAllowedFieldsItem{
-		//			ColumnType:        FilterSQLAllowedFieldsItemString,
+		//			ColumnType:        FilterSQLAllowedFieldsColumnTypeString,
 		//			AllowPartialMatch: true,
 		//		},
 		//	},
@@ -142,7 +142,7 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
 			},
 			true,
@@ -154,9 +154,9 @@ func TestToSQL(t *testing.T) {
 			"lat:52.4052963 lon:4.8856547 exact:false",
 			false,
 			map[string]FilterSQLAllowedFieldsItem{
-				"lat":   {ColumnType: FilterSQLAllowedFieldsItemDouble},
-				"lon":   {ColumnType: FilterSQLAllowedFieldsItemDouble},
-				"exact": {ColumnType: FilterSQLAllowedFieldsItemBool},
+				"lat":   {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
+				"lon":   {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
+				"exact": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
 			},
 			false,
 			"(lat=@GeneratedPlaceholder0 AND lon=@GeneratedPlaceholder1 AND exact IS @GeneratedPlaceholder2)",
@@ -171,11 +171,11 @@ func TestToSQL(t *testing.T) {
 			"truthy:1 falsey:0 also_truthy:t",
 			false,
 			map[string]FilterSQLAllowedFieldsItem{
-				"truthy": {ColumnType: FilterSQLAllowedFieldsItemBool},
-				"falsey": {ColumnType: FilterSQLAllowedFieldsItemBool},
+				"truthy": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
+				"falsey": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
 				"also_truthy": {
 					ColumnName: "alsoTruthy",
-					ColumnType: FilterSQLAllowedFieldsItemBool,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeBool,
 				},
 			},
 			false,
@@ -193,11 +193,11 @@ func TestToSQL(t *testing.T) {
 			map[string]FilterSQLAllowedFieldsItem{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterSQLAllowedFieldsItemInt,
+					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
 				},
-				"lat":  {ColumnType: FilterSQLAllowedFieldsItemDouble},
-				"lon":  {ColumnType: FilterSQLAllowedFieldsItemDouble},
-				"date": {ColumnType: FilterSQLAllowedFieldsItemDateTime},
+				"lat":  {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
+				"lon":  {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
+				"date": {ColumnType: FilterSQLAllowedFieldsColumnTypeDateTime},
 			},
 			false,
 			"(user_id>=@GeneratedPlaceholder0 AND lat<@GeneratedPlaceholder1 AND lon>@GeneratedPlaceholder2 AND date<=@GeneratedPlaceholder3)",
