@@ -150,6 +150,19 @@ func TestToSQL(t *testing.T) {
 			map[string]any{},
 		},
 		{
+			"disallowed field value",
+			"state:deleted",
+			false,
+			map[string]FilterSQLAllowedFieldsItem{
+				"state": {
+					AllowedValues: []string{"active", "canceled", "expired"},
+				},
+			},
+			true,
+			"",
+			map[string]any{},
+		},
+		{
 			"double columns and bool",
 			"lat:52.4052963 lon:4.8856547 exact:false",
 			false,
