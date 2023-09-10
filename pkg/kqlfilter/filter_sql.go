@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -92,9 +93,12 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (stri
 				condAnds = append(condAnds, fmt.Sprintf("%s IS @%s", columnName, placeholderName))
 				params[placeholderName] = boolVal
 			case FilterSQLAllowedFieldsItemDateTime:
-				// Should we validate that this string is actually a datetime?
+				t, err := time.Parse(time.RFC3339, clause.Value)
+				if err != nil {
+					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+				}
 				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
-				params[placeholderName] = clause.Value
+				params[placeholderName] = t
 			}
 		} else {
 			return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
