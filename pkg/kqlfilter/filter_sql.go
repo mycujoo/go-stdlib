@@ -7,22 +7,23 @@ import (
 )
 
 const (
-	FilterSQLColumnMapItemString = iota
-	FilterSQLColumnMapItemInt
-	FilterSQLColumnMapItemDouble
-	FilterSQLColumnMapItemBool
+	FilterSQLAllowedFieldsItemString = iota
+	FilterSQLAllowedFieldsItemInt
+	FilterSQLAllowedFieldsItemDouble
+	FilterSQLAllowedFieldsItemBool
 )
 
-type FilterSQLColumnMapItem struct {
-	// SQL table column name. Can be omitted if the column name is equal to the key in the column map.
+type FilterSQLAllowedFieldsItem struct {
+	// SQL table column name. Can be omitted if the column name is equal to the key in the column map
 	ColumnName string
 	// SQL column type
 	ColumnType int
-	// Allow prefix and/or suffix matching when a wildcard (`*`) is present. Only works for FilterColumnMapValueString
-	AllowPartialMatch bool
+	// Allow prefix matching when a wildcard (`*`) is present at the end of a string.
+	// Only applicable for FilterSQLAllowedFieldsItemString
+	AllowPrefixMatch bool
 }
 
-// toSQL turns a Filter into a partial SQL statement. It takes a map of columns that are allowed to be queried via this
+// toStandardSQL turns a Filter into a partial SQL statement. It takes a map of columns that are allowed to be queried via this
 // filter. It returns a SQL clause that can be added to a WHERE clause, along with associated params.
 // An example follows.
 //
@@ -30,7 +31,7 @@ type FilterSQLColumnMapItem struct {
 //
 //	[(Field: "userId", Value: "12345"), (Field: "email", Value: "*@example.com")]
 //
-// and a columnMap that looks like this:
+// and an allowedFields that looks like this:
 //
 //	{
 //		"userId": (ColumnName: "user_id", ColumnType: FilterColumnMapValueInt,    AllowPartialMatch: false),
@@ -47,67 +48,55 @@ type FilterSQLColumnMapItem struct {
 //		"@GeneratedPlaceholder0": 12345,
 //		"@GeneratedPlaceholder1": "@example.com"
 //	}
-func (f Filter) toSQL(columnMap map[string]FilterSQLColumnMapItem) (string, map[string]any) {
-	condAnds := []string{}
+func (f Filter) toStandardSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
+	var condAnds []string
 	params := map[string]any{}
 
 	for i, clause := range f.Clauses {
-		if cmv, ok := columnMap[clause.Field]; ok {
+		if cmv, ok := allowedFields[clause.Field]; ok {
 			columnName := cmv.ColumnName
 			if columnName == "" {
 				columnName = clause.Field
 			}
 			placeholderName := fmt.Sprintf("%s%d", "GeneratedPlaceholder", i)
 			switch cmv.ColumnType {
-			case FilterSQLColumnMapItemString:
-				if !cmv.AllowPartialMatch {
+			case FilterSQLAllowedFieldsItemString:
+				if cmv.AllowPrefixMatch && strings.HasSuffix(clause.Value, "*") {
+					// TODO: Handle escaped asterisk (*) characters that should not serve as wildcards
+					condAnds = append(condAnds, columnName+" LIKE @"+placeholderName)
+					escapedValue := strings.ReplaceAll(clause.Value, "%", "\\%")
+					params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
+				} else {
 					condAnds = append(condAnds, columnName+" = @"+placeholderName)
 					params[placeholderName] = clause.Value
-				} else {
-					// TODO: Handle for escaped asterisk (*) characters that should not serve as wildcards
-					prefixMatch := strings.HasPrefix(clause.Value, "*")
-					suffixMatch := strings.HasSuffix(clause.Value, "*")
-					if prefixMatch {
-						if suffixMatch {
-							condAnds = append(condAnds, columnName+" LIKE %@"+placeholderName+"%")
-							params[placeholderName] = clause.Value[1 : len(clause.Value)-1]
-						} else {
-							condAnds = append(condAnds, columnName+" LIKE %@"+placeholderName)
-							params[placeholderName] = clause.Value[1:len(clause.Value)]
-						}
-					} else if suffixMatch {
-						condAnds = append(condAnds, columnName+" LIKE @"+placeholderName+"%")
-						params[placeholderName] = clause.Value[0 : len(clause.Value)-1]
-					} else {
-						condAnds = append(condAnds, columnName+" = @"+placeholderName)
-						params[placeholderName] = clause.Value
-					}
 				}
-			case FilterSQLColumnMapItemInt:
+			case FilterSQLAllowedFieldsItemInt:
 				intVal, err := strconv.Atoi(clause.Value)
 				if err != nil {
-					continue
+					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, columnName+" = @"+placeholderName)
 				params[placeholderName] = intVal
-			case FilterSQLColumnMapItemDouble:
+			case FilterSQLAllowedFieldsItemDouble:
 				doubleVal, err := strconv.ParseFloat(clause.Value, 64)
 				if err != nil {
-					continue
+					return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 				}
 				condAnds = append(condAnds, columnName+" = @"+placeholderName)
 				params[placeholderName] = doubleVal
-			case FilterSQLColumnMapItemBool:
+			case FilterSQLAllowedFieldsItemBool:
 				boolVal, _ := strconv.ParseBool(clause.Value)
 				condAnds = append(condAnds, columnName+" IS @"+placeholderName)
 				params[placeholderName] = boolVal
 			}
+		} else {
+			return "", map[string]any{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 		}
 	}
 
 	if len(condAnds) == 0 {
-		return "", params
+		return "", params, nil
 	}
 	sql := "(" + strings.Join(condAnds, " AND ") + ")"
-	return sql, params
+	return sql, params, nil
 }
