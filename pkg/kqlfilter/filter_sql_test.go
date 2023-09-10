@@ -211,7 +211,7 @@ func TestToSQL(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			f, err := Parse(test.input, test.withRanges)
-			clause, params, err := f.toSQL(test.columnMap)
+			clause, params, err := f.ToSQL(test.columnMap)
 			if test.expectedError {
 				require.Error(t, err)
 				return

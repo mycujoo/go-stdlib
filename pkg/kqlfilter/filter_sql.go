@@ -24,7 +24,7 @@ type FilterSQLAllowedFieldsItem struct {
 	AllowPrefixMatch bool
 }
 
-// toSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
+// ToSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
 // filter (as a user should not be able to query all db columns via a filter). It returns a partial SQL statement that
 // can be added to a WHERE clause, along with associated params. An example follows.
 //
@@ -51,7 +51,7 @@ type FilterSQLAllowedFieldsItem struct {
 //	}
 //
 // Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
-func (f Filter) toSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
+func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) (string, map[string]any, error) {
 	var condAnds []string
 	params := map[string]any{}
 
