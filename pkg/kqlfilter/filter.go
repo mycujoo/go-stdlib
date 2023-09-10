@@ -8,19 +8,22 @@ type Filter struct {
 
 type Clause struct {
 	Field string
-	Value string
+	// One of the following: `=`, `<`, `<=`, `>`, `>=`
+	Operator string
+	Value    string
 }
 
 // Parse parses a filter string into a Filter struct.
 // The filter string must not contain any boolean operators, parentheses or nested queries.
-// The filter string must contain only simple clauses of the form "field:value".
+// The filter string must contain only simple clauses of the form "field:value", where all clauses are AND'ed.
+// Optionally, range operators can be enabled, e.g. for expressions involving date ranges.
 // If you need to parse a more complex filter string, use ParseAST instead.
-func Parse(input string) (Filter, error) {
+func Parse(input string, enableRangeOperator bool) (Filter, error) {
 	ast, err := ParseAST(input, DisableComplexExpressions())
 	if err != nil {
 		return Filter{}, err
 	}
-	return convertToSimpleFilter(ast)
+	return convertToSimpleFilter(ast, enableRangeOperator)
 }
 
 // ParseAST parses a filter string into an AST.
@@ -50,32 +53,47 @@ func DisableComplexExpressions() ParserOption {
 	}
 }
 
-func convertToSimpleFilter(ast Node) (Filter, error) {
+func convertToSimpleFilter(ast Node, enableRangeOperator bool) (Filter, error) {
 	if ast == nil {
 		return Filter{}, nil
 	}
 	switch n := ast.(type) {
 	case *AndNode:
-		return convertAndNode(n)
+		return convertAndNode(n, enableRangeOperator)
 	case *IsNode:
 		return convertIsNode(n)
+	case *RangeNode:
+		if enableRangeOperator {
+			return convertRangeNode(n)
+		}
+		return Filter{}, fmt.Errorf("unsupported node type %T", ast)
 	default:
 		return Filter{}, fmt.Errorf("unsupported node type %T", ast)
 	}
 }
 
-func convertAndNode(ast *AndNode) (Filter, error) {
+func convertAndNode(ast *AndNode, enableRangeOperator bool) (Filter, error) {
 	var filter Filter
 	for _, node := range ast.Nodes {
-		isNode, ok := node.(*IsNode)
-		if !ok {
-			return Filter{}, fmt.Errorf("unsupported node type %T", node)
+		switch n := node.(type) {
+		case *IsNode:
+			isNode, err := convertIsNode(n)
+			if err != nil {
+				return Filter{}, err
+			}
+			filter.Clauses = append(filter.Clauses, isNode.Clauses...)
+		case *RangeNode:
+			if !enableRangeOperator {
+				return Filter{}, fmt.Errorf("unsupported node type %T", ast)
+			}
+			rangeNode, err := convertRangeNode(n)
+			if err != nil {
+				return Filter{}, err
+			}
+			filter.Clauses = append(filter.Clauses, rangeNode.Clauses...)
+		default:
+			return Filter{}, fmt.Errorf("unsupported node type %T", ast)
 		}
-		f, err := convertIsNode(isNode)
-		if err != nil {
-			return Filter{}, err
-		}
-		filter.Clauses = append(filter.Clauses, f.Clauses...)
 	}
 	return filter, nil
 }
@@ -91,8 +109,32 @@ func convertIsNode(ast *IsNode) (Filter, error) {
 	return Filter{
 		Clauses: []Clause{
 			{
-				Field: ast.Identifier,
-				Value: value,
+				Field:    ast.Identifier,
+				Operator: "=",
+				Value:    value,
+			},
+		},
+	}, nil
+}
+
+func convertRangeNode(ast *RangeNode) (Filter, error) {
+	var value string
+	switch n := ast.Value.(type) {
+	case *LiteralNode:
+		value = n.Value
+	default:
+		return Filter{}, fmt.Errorf("unsupported node type %T", ast.Value)
+	}
+	operator := ast.Operator.String()
+	if operator == "???" {
+		return Filter{}, fmt.Errorf("unsupported operator %s", operator)
+	}
+	return Filter{
+		Clauses: []Clause{
+			{
+				Field:    ast.Identifier,
+				Operator: operator,
+				Value:    value,
 			},
 		},
 	}, nil

@@ -133,9 +133,6 @@ func (p *parser) parseAnd() Node {
 	not := p.parseNot()
 	n.append(not)
 	for p.peek().typ == itemAnd {
-		if p.disableComplexExpressions {
-			p.errorf("complex expressions are not allowed")
-		}
 		p.next()
 		not = p.parseNot()
 		n.append(not)
