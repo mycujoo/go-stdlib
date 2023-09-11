@@ -1,6 +1,7 @@
 package kqlfilter
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestToSQL(t *testing.T) {
 		name           string
 		input          string
 		withRanges     bool
-		columnMap      map[string]FilterSQLAllowedFieldsItem
+		columnMap      map[string]FilterToSpannerFieldConfig
 		expectedError  bool
 		expectedSQL    string
 		expectedParams map[string]any
@@ -24,10 +25,10 @@ func TestToSQL(t *testing.T) {
 			"one integer field",
 			"userId:12345",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
 			},
 			false,
@@ -40,13 +41,13 @@ func TestToSQL(t *testing.T) {
 			"one integer field and one string field",
 			"userId:12345 email:johnexamplecom",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
 				"email": {
-					ColumnType: FilterSQLAllowedFieldsColumnTypeString,
+					ColumnType: FilterToSpannerFieldColumnTypeString,
 				},
 			},
 			false,
@@ -60,13 +61,13 @@ func TestToSQL(t *testing.T) {
 			"one integer field and one string field with no partial matching allowed",
 			"userId:12345 email:*examplecom",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
 				"email": {
-					ColumnType: FilterSQLAllowedFieldsColumnTypeString,
+					ColumnType: FilterToSpannerFieldColumnTypeString,
 				},
 			},
 			false,
@@ -80,13 +81,13 @@ func TestToSQL(t *testing.T) {
 			"one integer field and one string field with prefix matching allowed",
 			"userId:12345 email:johnexample*",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
 				"email": {
-					ColumnType:       FilterSQLAllowedFieldsColumnTypeString,
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
 					AllowPrefixMatch: true,
 				},
 			},
@@ -102,9 +103,9 @@ func TestToSQL(t *testing.T) {
 		//	"escape percentage sign with wildcard suffix allowed",
 		//	"discount_string:70%*",
 		//  false,
-		//	map[string]FilterSQLAllowedFieldsItem{
+		//	map[string]FilterToSpannerFieldConfig{
 		//		"email": {
-		//			ColumnType:       FilterSQLAllowedFieldsColumnTypeString,
+		//			ColumnType:       FilterToSpannerFieldColumnTypeString,
 		//			AllowPrefixMatch: true,
 		//		},
 		//	},
@@ -119,13 +120,13 @@ func TestToSQL(t *testing.T) {
 		//	"one integer field and one string field with wildcards allowed, illegal wildcard in middle",
 		//	"userId:12345 email:*example*com",
 		//  false,
-		//	map[string]FilterSQLAllowedFieldsItem{
-		//		"userId": FilterSQLAllowedFieldsItem{
+		//	map[string]FilterToSpannerFieldConfig{
+		//		"userId": FilterToSpannerFieldConfig{
 		//			ColumnName: "u.user_id",
-		//			ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+		//			ColumnType: FilterToSpannerFieldColumnTypeInt,
 		//		},
-		//		"email": FilterSQLAllowedFieldsItem{
-		//			ColumnType:        FilterSQLAllowedFieldsColumnTypeString,
+		//		"email": FilterToSpannerFieldConfig{
+		//			ColumnType:        FilterToSpannerFieldColumnTypeString,
 		//			AllowPartialMatch: true,
 		//		},
 		//	},
@@ -139,10 +140,10 @@ func TestToSQL(t *testing.T) {
 			"disallowed column",
 			"userId:12345 password:qwertyuiop",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
 			},
 			true,
@@ -153,9 +154,19 @@ func TestToSQL(t *testing.T) {
 			"disallowed field value",
 			"state:deleted",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					AllowedValues: map[string]string{"active": "active", "canceled": "canceled", "expired": "expired"},
+					ValueMap: func(inputValue string) (interface{}, error) {
+						switch inputValue {
+						case "active":
+							return "active", nil
+						case "canceled":
+							return "canceled", nil
+						case "expired":
+							return "expired", nil
+						}
+						return nil, errors.New("illegal value provided")
+					},
 				},
 			},
 			true,
@@ -166,9 +177,19 @@ func TestToSQL(t *testing.T) {
 			"allowed field value with implicit column value",
 			"state:active",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					AllowedValues: map[string]string{"active": "", "canceled": "", "expired": ""},
+					ValueMap: func(inputValue string) (interface{}, error) {
+						switch inputValue {
+						case "active":
+							return "active", nil
+						case "canceled":
+							return "canceled", nil
+						case "expired":
+							return "expired", nil
+						}
+						return nil, errors.New("illegal value provided")
+					},
 				},
 			},
 			false,
@@ -181,12 +202,18 @@ func TestToSQL(t *testing.T) {
 			"allowed field value with input and column values differing",
 			"state:payment_state_active",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					AllowedValues: map[string]string{
-						"payment_state_active":   "active",
-						"payment_state_canceled": "canceled",
-						"payment_state_expired":  "expired",
+					ValueMap: func(inputValue string) (interface{}, error) {
+						switch inputValue {
+						case "payment_state_active":
+							return "active", nil
+						case "payment_state_canceled":
+							return "canceled", nil
+						case "payment_state_expired":
+							return "expired", nil
+						}
+						return nil, errors.New("illegal value provided")
 					},
 				},
 			},
@@ -200,10 +227,10 @@ func TestToSQL(t *testing.T) {
 			"double columns and bool",
 			"lat:52.4052963 lon:4.8856547 exact:false",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
-				"lat":   {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
-				"lon":   {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
-				"exact": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
+			map[string]FilterToSpannerFieldConfig{
+				"lat":   {ColumnType: FilterToSpannerFieldColumnTypeDouble},
+				"lon":   {ColumnType: FilterToSpannerFieldColumnTypeDouble},
+				"exact": {ColumnType: FilterToSpannerFieldColumnTypeBool},
 			},
 			false,
 			"(lat=@GeneratedPlaceholder0 AND lon=@GeneratedPlaceholder1 AND exact IS @GeneratedPlaceholder2)",
@@ -217,12 +244,12 @@ func TestToSQL(t *testing.T) {
 			"fuzzy booleans",
 			"truthy:1 falsey:0 also_truthy:t",
 			false,
-			map[string]FilterSQLAllowedFieldsItem{
-				"truthy": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
-				"falsey": {ColumnType: FilterSQLAllowedFieldsColumnTypeBool},
+			map[string]FilterToSpannerFieldConfig{
+				"truthy": {ColumnType: FilterToSpannerFieldColumnTypeBool},
+				"falsey": {ColumnType: FilterToSpannerFieldColumnTypeBool},
 				"also_truthy": {
 					ColumnName: "alsoTruthy",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeBool,
+					ColumnType: FilterToSpannerFieldColumnTypeBool,
 				},
 			},
 			false,
@@ -237,14 +264,14 @@ func TestToSQL(t *testing.T) {
 			"all four range operators",
 			"userId>=12345 lat<50.0 lon>4.1 date<=\"2023-06-01T23:00:00.20Z\"",
 			true,
-			map[string]FilterSQLAllowedFieldsItem{
+			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterSQLAllowedFieldsColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
 				},
-				"lat":  {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
-				"lon":  {ColumnType: FilterSQLAllowedFieldsColumnTypeDouble},
-				"date": {ColumnType: FilterSQLAllowedFieldsColumnTypeDateTime},
+				"lat":  {ColumnType: FilterToSpannerFieldColumnTypeDouble},
+				"lon":  {ColumnType: FilterToSpannerFieldColumnTypeDouble},
+				"date": {ColumnType: FilterToSpannerFieldColumnTypeDateTime},
 			},
 			false,
 			"(user_id>=@GeneratedPlaceholder0 AND lat<@GeneratedPlaceholder1 AND lon>@GeneratedPlaceholder2 AND date<=@GeneratedPlaceholder3)",
@@ -260,7 +287,7 @@ func TestToSQL(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			f, err := Parse(test.input, test.withRanges)
-			condAnds, params, err := f.ToSQL(test.columnMap)
+			condAnds, params, err := f.ToSpannerSQL(test.columnMap)
 			if test.expectedError {
 				require.Error(t, err)
 				return
