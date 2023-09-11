@@ -282,6 +282,17 @@ func TestToSQL(t *testing.T) {
 				"GeneratedPlaceholder3": time.Date(2023, time.June, 1, 23, 0, 0, 200000000, time.UTC),
 			},
 		},
+		{
+			"repeat query on same field more than allowed",
+			"count>=1 and count<5 and count>3",
+			true,
+			map[string]FilterToSpannerFieldConfig{
+				"count": {},
+			},
+			true,
+			"",
+			map[string]any{},
+		},
 	}
 
 	for _, test := range testCases {

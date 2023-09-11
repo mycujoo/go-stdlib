@@ -1,6 +1,7 @@
 package kqlfilter
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -64,9 +65,18 @@ type FilterToSpannerFieldConfig struct {
 func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig) ([]string, map[string]interface{}, error) {
 	var condAnds []string
 	params := map[string]interface{}{}
+	fieldCount := map[string]int{}
 
 	for i, clause := range f.Clauses {
 		if fieldConfig, ok := fieldConfigs[clause.Field]; ok {
+			fieldCount[clause.Field] += 1
+			if fieldCount[clause.Field] > 2 {
+				// A field can never be addressed more than twice (and only once for '=', but we permit that for now)
+				// Prevent this to ensure that an end-user cannot build an enormously complex query by endless field
+				// repetition.
+				return []string{}, map[string]interface{}{}, errors.New("field count maximum in filter exceeded")
+			}
+
 			placeholderName := fmt.Sprintf("%s%d", "GeneratedPlaceholder", i)
 			columnName := fieldConfig.ColumnName
 			if columnName == "" {
