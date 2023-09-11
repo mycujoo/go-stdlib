@@ -155,7 +155,7 @@ func TestToSQL(t *testing.T) {
 			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"state": {
-					AllowedValues: []FilterSQLAllowedFieldsItemAllowedValue{{InputValue: "active"}, {InputValue: "canceled"}, {InputValue: "expired"}},
+					AllowedValues: map[string]string{"active": "active", "canceled": "canceled", "expired": "expired"},
 				},
 			},
 			true,
@@ -168,11 +168,7 @@ func TestToSQL(t *testing.T) {
 			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"state": {
-					AllowedValues: []FilterSQLAllowedFieldsItemAllowedValue{
-						{InputValue: "active"},
-						{InputValue: "canceled"},
-						{InputValue: "expired"},
-					},
+					AllowedValues: map[string]string{"active": "", "canceled": "", "expired": ""},
 				},
 			},
 			false,
@@ -187,10 +183,10 @@ func TestToSQL(t *testing.T) {
 			false,
 			map[string]FilterSQLAllowedFieldsItem{
 				"state": {
-					AllowedValues: []FilterSQLAllowedFieldsItemAllowedValue{
-						{InputValue: "payment_state_active", ColumnValue: "active"},
-						{InputValue: "payment_state_canceled", ColumnValue: "canceled"},
-						{InputValue: "payment_state_expired", ColumnValue: "expired"},
+					AllowedValues: map[string]string{
+						"payment_state_active":   "active",
+						"payment_state_canceled": "canceled",
+						"payment_state_expired":  "expired",
 					},
 				},
 			},

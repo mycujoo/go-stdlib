@@ -26,15 +26,11 @@ type FilterSQLAllowedFieldsItem struct {
 	// Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to false.
 	AllowPrefixMatch bool
 	// The values that the user is allowed to use in the query. Typically used for enums. Does not work in combination
-	// with prefix matching. Only applicable for FilterSQLAllowedFieldsColumnTypeString. Defaults to allowing any value.
-	AllowedValues []FilterSQLAllowedFieldsItemAllowedValue
-}
-
-type FilterSQLAllowedFieldsItemAllowedValue struct {
-	// The value that the user provides in the filter
-	InputValue string
-	// The value as it is stored in the database table. Defaults to the InputValue.
-	ColumnValue string
+	// with prefix matching, and is only applicable for FilterSQLAllowedFieldsColumnTypeString.
+	// The key in this map should be the value as the user is allowed to provide it. If a non-empty value is also
+	// provided, this is the value used in the query, otherwise it falls back to the user-provided value.
+	// Defaults to an empty map that allows all values.
+	AllowedValues map[string]string
 }
 
 // ToSQL turns a Filter into a partial SQL statement. It takes a map of fields that are allowed to be queried via this
@@ -83,20 +79,14 @@ func (f Filter) ToSQL(allowedFields map[string]FilterSQLAllowedFieldsItem) ([]st
 					escapedValue := strings.ReplaceAll(clause.Value, "%", "\\%")
 					params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
 				} else if len(cmv.AllowedValues) > 0 {
-					found := false
-					for _, v := range cmv.AllowedValues {
-						if v.InputValue == clause.Value {
-							condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
-							coalescedValue := v.ColumnValue
-							if coalescedValue == "" {
-								coalescedValue = v.InputValue
-							}
-							params[placeholderName] = coalescedValue
-							found = true
-							break
+					if allowedColumnValue, ok := cmv.AllowedValues[clause.Value]; ok {
+						condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
+						coalescedValue := allowedColumnValue
+						if coalescedValue == "" {
+							coalescedValue = clause.Value
 						}
-					}
-					if !found {
+						params[placeholderName] = coalescedValue
+					} else {
 						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 					}
 				} else {
