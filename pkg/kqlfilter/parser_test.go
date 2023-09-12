@@ -188,6 +188,12 @@ func TestParseAST(t *testing.T) {
 			false,
 			"a={b={c={d={e={f={g={h={i={j={k={l={m={n={o={p={q={r={s={t=1}}}}}}}}}}}}}}}}}}}",
 		},
+		{
+			"complexity error",
+			"field:(a OR b OR c OR d OR e OR f OR g OR h OR i OR j OR k OR l) OR field:(m OR n OR o OR p OR q OR r OR s OR t OR u OR v OR w OR x OR y OR z)",
+			true,
+			"",
+		},
 	}
 
 	for _, test := range testCases {
