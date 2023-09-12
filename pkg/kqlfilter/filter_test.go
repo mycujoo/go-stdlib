@@ -17,6 +17,13 @@ func TestParse(t *testing.T) {
 		expected      Filter
 	}{
 		{
+			"empty",
+			"  ",
+			false,
+			false,
+			Filter{},
+		},
+		{
 			"one field",
 			"field:value",
 			false,

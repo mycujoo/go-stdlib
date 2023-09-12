@@ -3,7 +3,6 @@ package kqlfilter
 import (
 	"fmt"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -36,11 +35,9 @@ const (
 	itemSpace         // run of spaces
 	itemBool          // boolean constant
 	itemString        // string (includes quotes)
-	itemIdentifier    // alphanumeric identifier
 	itemOr            // 'or'
 	itemAnd           // 'and'
 	itemNot           // 'not'
-	itemNumber        // number
 	itemLeftParen     // '('
 	itemRightParen    // ')'
 	itemLeftBrace     // '{'
@@ -57,11 +54,9 @@ var itemName = map[itemType]string{
 	itemSpace:         "space",
 	itemBool:          "bool",
 	itemString:        "string",
-	itemIdentifier:    "identifier",
 	itemOr:            "or",
 	itemAnd:           "and",
 	itemNot:           "not",
-	itemNumber:        "number",
 	itemLeftParen:     "(",
 	itemRightParen:    ")",
 	itemLeftBrace:     "{",
@@ -237,9 +232,6 @@ func lexExpression(l *lexer) stateFn {
 		return l.emit(itemColon)
 	case r == '"':
 		return lexQuote
-	case r == '.' || r == '+' || r == '-' || ('0' <= r && r <= '9'):
-		l.backup()
-		return lexNumber
 	case r == '<' || r == '>':
 		return lexRangeOperator
 	case r == '*':
@@ -262,13 +254,8 @@ func lexExpression(l *lexer) stateFn {
 			return l.errorf("unexpected right brace")
 		}
 		return l.emit(itemRightBrace)
-	case isLetterOrDigit(r) || r == '\\':
-		l.backup()
-		return lexIdentifier
-	case unicode.IsPrint(r):
-		return lexText
 	default:
-		return l.errorf("unrecognized character in the input: %#U", r)
+		return lexString
 	}
 }
 
@@ -304,35 +291,8 @@ Loop:
 	return l.emit(itemString)
 }
 
-// lexNumber scans a number: decimal, octal, hex, float. This
-// isn't a perfect number scanner - for instance it accepts "." and "0x0.2"
-// and "089" - but when it's wrong the input is invalid and the parser (via
-// strconv) will notice.
-func lexNumber(l *lexer) stateFn {
-	if !l.scanNumber() {
-		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
-	}
-	return l.emit(itemNumber)
-}
-
-func (l *lexer) scanNumber() bool {
-	// Optional leading sign.
-	l.accept("+-")
-	digits := "0123456789_"
-	l.acceptRun(digits)
-	if l.accept(".") {
-		l.acceptRun(digits)
-	}
-	// Next thing mustn't be alphanumeric.
-	if isLetterOrDigit(l.peek()) {
-		l.next()
-		return false
-	}
-	return true
-}
-
-// lexIdentifier scans an alphanumeric dotted identifier.
-func lexIdentifier(l *lexer) stateFn {
+// lexString scans continuous string until it finds a special symbol
+func lexString(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
 		case !isSpecialSymbol(r) && r != eof && !isSpace(r):
@@ -382,7 +342,7 @@ func lexIdentifier(l *lexer) stateFn {
 				// Replace escaped characters.
 
 				item := item{
-					typ:  itemIdentifier,
+					typ:  itemString,
 					pos:  l.start,
 					val:  replaceEscapes(l.input[l.start:l.pos]),
 					line: l.startLine,
@@ -443,26 +403,9 @@ func lexRangeOperator(l *lexer) stateFn {
 	return l.emit(itemRangeOperator)
 }
 
-// lexText consumes printable characters.
-func lexText(l *lexer) stateFn {
-	for {
-		r := l.peek()
-		if !unicode.IsPrint(r) {
-			break
-		}
-		l.next()
-	}
-	return l.emit(itemString)
-}
-
 // isSpace reports whether r is a space character.
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
-}
-
-// isLetterOrDigit reports whether r is a letter, digit, or underscore.
-func isLetterOrDigit(r rune) bool {
-	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // isSpecialSymbol reports whether r is a special symbol.

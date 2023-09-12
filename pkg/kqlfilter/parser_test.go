@@ -194,6 +194,12 @@ func TestParseAST(t *testing.T) {
 			true,
 			"",
 		},
+		{
+			"string with leading digit",
+			"state:PAYMENT_STATE_FAILED AND content_reference.id:2Ubp5JU6lfqmAWXi0I7fnl1z29y",
+			false,
+			"(state=PAYMENT_STATE_FAILED AND content_reference.id=2Ubp5JU6lfqmAWXi0I7fnl1z29y)",
+		},
 	}
 
 	for _, test := range testCases {

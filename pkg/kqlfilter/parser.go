@@ -212,7 +212,7 @@ func (p *parser) parseSubQuery() Node {
 
 func (p *parser) parseExpression() Node {
 	switch p.peek().typ {
-	case itemIdentifier:
+	case itemString:
 		idItem := p.next()
 		p.eatSpace()
 
@@ -308,9 +308,7 @@ func (p *parser) parseValue() Node {
 		valueCount++
 		item := p.expectOneOf([]itemType{
 			itemString,
-			itemNumber,
 			itemBool,
-			itemIdentifier,
 			itemWildcard,
 		}, "value")
 		if item.typ == itemString && strings.HasPrefix(item.val, `"`) {

@@ -1,6 +1,9 @@
 package kqlfilter
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Filter struct {
 	Clauses []Clause
@@ -19,6 +22,9 @@ type Clause struct {
 // Optionally, range operators can be enabled, e.g. for expressions involving date ranges.
 // If you need to parse a more complex filter string, use ParseAST instead.
 func Parse(input string, enableRangeOperator bool) (Filter, error) {
+	if strings.TrimSpace(input) == "" {
+		return Filter{}, nil
+	}
 	ast, err := ParseAST(input, DisableComplexExpressions())
 	if err != nil {
 		return Filter{}, err
