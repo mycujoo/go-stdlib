@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-    filter, err := kqlfilter.Parse("foo:bar")
+    filter, err := kqlfilter.Parse("foo:bar", false)
     if err != nil {
         panic(err)
     }
