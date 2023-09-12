@@ -288,7 +288,18 @@ Loop:
 			break Loop
 		}
 	}
-	return l.emit(itemString)
+	// Replace escaped characters.
+
+	item := item{
+		typ:  itemString,
+		pos:  l.start,
+		val:  replaceEscapes(l.input[l.start:l.pos]),
+		line: l.startLine,
+	}
+	l.emitItem(item)
+	l.start = l.pos
+	l.startLine = l.line
+	return nil
 }
 
 // lexString scans continuous string until it finds a special symbol

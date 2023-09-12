@@ -112,6 +112,17 @@ func TestLexer(t *testing.T) {
 			},
 		},
 		{
+			"quoted escape filter",
+			`field: "value \" two"`,
+			[]item{
+				newItem(itemString, "field"),
+				tColon,
+				tSpace,
+				newItem(itemString, `"value " two"`),
+				tEOF,
+			},
+		},
+		{
 			"unicode filter",
 			"field: \"Lūgēte, ō Venerēs Cupīdinēsque\"",
 			[]item{
