@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToSpannerSQL(t *testing.T) {
@@ -97,44 +98,75 @@ func TestToSpannerSQL(t *testing.T) {
 				"KQL1": "johnexample%",
 			},
 		},
-		// Disabled test, parser breaks
-		// {
-		//	"escape percentage sign with wildcard suffix allowed",
-		//	"discount_string:70%*",
-		//  false,
-		//	map[string]FilterToSpannerFieldConfig{
-		//		"email": {
-		//			ColumnType:       FilterToSpannerFieldColumnTypeString,
-		//			AllowPrefixMatch: true,
-		//		},
-		//	},
-		//	false,
-		//	"(email LIKE @KQL0)",
-		//	map[string]any{
-		//		"KQL0": "70\\%%",
-		//	},
-		// },
-		// Disabled test, parser breaks
-		// {
-		//	"one integer field and one string field with wildcards allowed, illegal wildcard in middle",
-		//	"userId:12345 email:*example*com",
-		//  false,
-		//	map[string]FilterToSpannerFieldConfig{
-		//		"userId": FilterToSpannerFieldConfig{
-		//			ColumnName: "u.user_id",
-		//			ColumnType: FilterToSpannerFieldColumnTypeInt,
-		//		},
-		//		"email": FilterToSpannerFieldConfig{
-		//			ColumnType:        FilterToSpannerFieldColumnTypeString,
-		//			AllowPartialMatch: true,
-		//		},
-		//	},
-		//  false,
-		//	"(u.user_id=@KQL0)",
-		//	map[string]any{
-		//		"KQL0": 12345,
-		//	},
-		// },
+		{
+			"escape percentage sign with wildcard suffix allowed",
+			"discount_string:70%*",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"discount_string": {
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
+					AllowPrefixMatch: true,
+				},
+			},
+			false,
+			"(discount_string LIKE @KQL0)",
+			map[string]any{
+				"KQL0": "70\\%%",
+			},
+		},
+		{
+			"one integer field and one string field with wildcards allowed, illegal wildcard in middle",
+			"userId:12345 email:*example*com",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"userId": FilterToSpannerFieldConfig{
+					ColumnName: "u.user_id",
+					ColumnType: FilterToSpannerFieldColumnTypeInt,
+				},
+				"email": FilterToSpannerFieldConfig{
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
+					AllowPrefixMatch: true,
+				},
+			},
+			false,
+			"(u.user_id=@KQL0 AND email=@KQL1)",
+			map[string]any{
+				"KQL0": int64(12345),
+				"KQL1": "*example*com",
+			},
+		},
+		{
+			"email prefix",
+			"email:john@*",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"email": FilterToSpannerFieldConfig{
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
+					AllowPrefixMatch: true,
+				},
+			},
+			false,
+			"(email LIKE @KQL0)",
+			map[string]any{
+				"KQL0": "john@%",
+			},
+		},
+		{
+			"email match",
+			"email:john@example.com",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"email": FilterToSpannerFieldConfig{
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
+					AllowPrefixMatch: true,
+				},
+			},
+			false,
+			"(email=@KQL0)",
+			map[string]any{
+				"KQL0": "john@example.com",
+			},
+		},
 		{
 			"disallowed column",
 			"userId:12345 password:qwertyuiop",
@@ -303,6 +335,9 @@ func TestToSpannerSQL(t *testing.T) {
 					t.Errorf("expected error, but got none")
 				}
 				return
+			} else {
+				require.NoError(t, errParse)
+				require.NoError(t, err)
 			}
 
 			sql := ""

@@ -3,6 +3,7 @@ package kqlfilter
 import (
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 // parser is the representation of a single parsed filter.
@@ -16,6 +17,10 @@ type parser struct {
 	// Disallow complex expressions:
 	// OR, AND, NOT, grouping parentheses or nested queries.
 	disableComplexExpressions bool
+	maxDepth                  int
+	currentDepth              int
+	maxComplexity             int
+	currentComplexity         int
 }
 
 // next returns the next token.
@@ -41,6 +46,12 @@ func (p *parser) peek() item {
 	p.peekCount = 1
 	p.token[0] = p.lex.nextItem()
 	return p.token[0]
+}
+
+func (p *parser) eatSpace() {
+	for p.peek().typ == itemSpace {
+		p.next()
+	}
 }
 
 // Parsing.
@@ -95,12 +106,16 @@ func (p *parser) recover(errp *error) {
 
 // parse is the top-level parser for the KQL query
 func (p *parser) parse() {
+	p.currentDepth = 0
+	p.eatSpace()
+
 	head := p.parseOr()
 	// Handle implicit AND
 	if p.peek().typ != itemEOF {
 		andN := p.newAndNode(0)
 		andN.append(head)
 		for p.peek().typ != itemEOF {
+			p.eatSpace()
 			andN.append(p.parseOr())
 		}
 		p.Root = andN
@@ -113,11 +128,21 @@ func (p *parser) parseOr() Node {
 	n := p.newOrNode(p.peek().pos)
 	and := p.parseAnd()
 	n.append(and)
+	// optional space before OR
+	p.eatSpace()
 	for p.peek().typ == itemOr {
 		if p.disableComplexExpressions {
 			p.errorf("complex expressions are not allowed")
 		}
+		p.currentComplexity++
+
+		if p.currentComplexity > p.maxComplexity {
+			p.errorf("maximum complexity exceeded")
+		}
+
 		p.next()
+		p.eatSpace()
+
 		and = p.parseAnd()
 		n.append(and)
 	}
@@ -132,8 +157,16 @@ func (p *parser) parseAnd() Node {
 	n := p.newAndNode(p.peek().pos)
 	not := p.parseNot()
 	n.append(not)
+	p.eatSpace()
 	for p.peek().typ == itemAnd {
+		p.currentComplexity++
+
+		if p.currentComplexity > p.maxComplexity {
+			p.errorf("maximum complexity exceeded")
+		}
+
 		p.next()
+		p.eatSpace()
 		not = p.parseNot()
 		n.append(not)
 	}
@@ -148,6 +181,8 @@ func (p *parser) parseNot() Node {
 	if p.peek().typ == itemNot {
 		pos := p.peek().pos
 		p.next()
+		p.eatSpace()
+
 		expr := p.parseSubQuery()
 		return p.newNotNode(pos, expr)
 	}
@@ -157,8 +192,19 @@ func (p *parser) parseNot() Node {
 func (p *parser) parseSubQuery() Node {
 	if p.peek().typ == itemLeftParen {
 		p.next()
+		p.eatSpace()
+		p.currentDepth++
+
+		if p.maxDepth > 0 && p.currentDepth+1 > p.maxDepth {
+			p.errorf("maximum nesting depth exceeded")
+		}
+
 		n := p.parseOr()
+		p.eatSpace()
+
 		p.expect(itemRightParen, "subquery")
+
+		p.currentDepth--
 		return n
 	}
 	return p.parseExpression()
@@ -168,14 +214,17 @@ func (p *parser) parseExpression() Node {
 	switch p.peek().typ {
 	case itemIdentifier:
 		idItem := p.next()
+		p.eatSpace()
 
 		op := p.next()
 
 		switch op.typ {
 		case itemColon:
+			p.eatSpace()
 			value := p.parseListOfValues()
 			return p.newIsNode(idItem.pos, idItem.val, value)
 		case itemRangeOperator:
+			p.eatSpace()
 			value := p.parseValue()
 			var rop RangeOperator
 			switch op.val {
@@ -206,18 +255,42 @@ func (p *parser) parseListOfValues() Node {
 		if p.disableComplexExpressions {
 			p.errorf("complex expressions are not allowed")
 		}
+		p.currentDepth++
+
+		if p.maxDepth > 0 && p.currentDepth+1 > p.maxDepth {
+			p.errorf("maximum nesting depth exceeded")
+		}
+
 		p.next()
+		p.eatSpace()
+
 		n := p.parseOr()
+		p.eatSpace()
+
 		p.expect(itemRightBrace, "list of values")
+
+		p.currentDepth--
 		return p.newNestedNode(peeked.pos, n)
 	}
 	if peeked.typ == itemLeftParen {
 		if p.disableComplexExpressions {
 			p.errorf("complex expressions are not allowed")
 		}
+
+		p.currentDepth++
+
+		if p.maxDepth > 0 && p.currentDepth+1 > p.maxDepth {
+			p.errorf("maximum nesting depth exceeded")
+		}
+
 		p.next()
+		p.eatSpace()
+
 		n := p.parseOr()
+		p.eatSpace()
 		p.expect(itemRightParen, "list of values")
+
+		p.currentDepth--
 		return n
 	}
 	return p.parseValue()
@@ -225,28 +298,41 @@ func (p *parser) parseListOfValues() Node {
 
 func (p *parser) parseValue() Node {
 	var value string
+	pos := p.peek().pos
 
-	// Allow prefix wildcard
-	if p.peek().typ == itemWildcard {
-		p.next()
-		value = "*"
-	}
-	item := p.expectOneOf([]itemType{
-		itemString,
-		itemNumber,
-		itemBool,
-		itemIdentifier,
-	}, "value")
-	value += item.val
-	if item.typ == itemString {
-		// Strip the quotes
-		value = value[1 : len(value)-1]
-	}
-	// Check for suffix wildcard
-	if p.peek().typ == itemWildcard {
-		p.next()
-		value += "*"
+	valueCount := 0
+	for {
+		if p.atTerminator() {
+			break
+		}
+		valueCount++
+		item := p.expectOneOf([]itemType{
+			itemString,
+			itemNumber,
+			itemBool,
+			itemIdentifier,
+			itemWildcard,
+		}, "value")
+		if item.typ == itemString && strings.HasPrefix(item.val, `"`) {
+			// Strip the quotes
+			item.val = item.val[1 : len(item.val)-1]
+		}
+		value += item.val
 	}
 
-	return p.newLiteralNode(item.pos, value)
+	if valueCount == 0 {
+		p.errorf("value expected")
+	}
+
+	return p.newLiteralNode(pos, value)
+}
+
+func (p *parser) atTerminator() bool {
+	item := p.peek()
+	switch item.typ {
+	case itemEOF, itemSpace, itemLeftBrace, itemLeftParen, itemRightParen, itemRightBrace:
+		return true
+	default:
+		return false
+	}
 }

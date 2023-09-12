@@ -23,13 +23,16 @@ func Parse(input string, enableRangeOperator bool) (Filter, error) {
 	if err != nil {
 		return Filter{}, err
 	}
-	return convertToSimpleFilter(ast, enableRangeOperator)
+	return convertToFilter(ast, enableRangeOperator)
 }
 
 // ParseAST parses a filter string into an AST.
 // The filter string must be a valid Kibana query language filter string.
 func ParseAST(input string, options ...ParserOption) (n Node, err error) {
-	p := &parser{}
+	p := &parser{
+		maxDepth:      20,
+		maxComplexity: 20,
+	}
 	for _, option := range options {
 		option(p)
 	}
@@ -53,7 +56,21 @@ func DisableComplexExpressions() ParserOption {
 	}
 }
 
-func convertToSimpleFilter(ast Node, enableRangeOperator bool) (Filter, error) {
+// WithMaxDepth sets limit to maximum number of nesting.
+func WithMaxDepth(depth int) ParserOption {
+	return func(p *parser) {
+		p.maxDepth = depth
+	}
+}
+
+// WithMaxComplexity sets limit to maximum number of individual clauses separated by boolean operators.
+func WithMaxComplexity(complexity int) ParserOption {
+	return func(p *parser) {
+		p.maxComplexity = complexity
+	}
+}
+
+func convertToFilter(ast Node, enableRangeOperator bool) (Filter, error) {
 	if ast == nil {
 		return Filter{}, nil
 	}

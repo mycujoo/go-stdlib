@@ -15,6 +15,7 @@ func newItem(typ itemType, text string) item {
 
 var (
 	tEOF      = newItem(itemEOF, "")
+	tSpace    = newItem(itemSpace, " ")
 	tLparen   = newItem(itemLeftParen, "(")
 	tRparen   = newItem(itemRightParen, ")")
 	tLbrace   = newItem(itemLeftBrace, "{")
@@ -61,6 +62,7 @@ func TestLexer(t *testing.T) {
 			"white space",
 			" \n\t\r",
 			[]item{
+				newItem(itemSpace, " \n\t\r"),
 				tEOF,
 			},
 		},
@@ -70,6 +72,7 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				newItem(itemIdentifier, "value"),
 				tWildcard,
 				tEOF,
@@ -87,9 +90,10 @@ func TestLexer(t *testing.T) {
 		},
 		{
 			"number range 2",
-			"temp<=-20",
+			"temp <=-20",
 			[]item{
 				newItem(itemIdentifier, "temp"),
+				tSpace,
 				newItem(itemRangeOperator, "<="),
 				newItem(itemNumber, "-20"),
 				tEOF,
@@ -101,6 +105,7 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				newItem(itemString, `"value two"`),
 				tWildcard,
 				tEOF,
@@ -112,6 +117,7 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				newItem(itemString, `"Lūgēte, ō Venerēs Cupīdinēsque"`),
 				tEOF,
 			},
@@ -142,9 +148,12 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				tLparen,
 				newItem(itemIdentifier, "one"),
+				newItem(itemSpace, "  "),
 				newItem(itemOr, "OR"),
+				tSpace,
 				newItem(itemIdentifier, "two"),
 				tRparen,
 				tEOF,
@@ -156,6 +165,7 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				tLparen,
 				newItem(itemError, "unclosed left parenthesis"),
 			},
@@ -166,9 +176,12 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				tLparen,
 				newItem(itemIdentifier, "one"),
+				tSpace,
 				newItem(itemOr, "OR"),
+				tSpace,
 				newItem(itemIdentifier, "two"),
 				tRparen,
 				newItem(itemError, "unexpected right parenthesis"),
@@ -180,6 +193,7 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				tLbrace,
 				newItem(itemIdentifier, "one"),
 				tColon,
@@ -194,10 +208,12 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				tLbrace,
 				newItem(itemIdentifier, "nested"),
 				tColon,
 				tLbrace,
+				tSpace,
 				newItem(itemIdentifier, "field"),
 				tColon,
 				newItem(itemString, `"value"`),
@@ -222,7 +238,39 @@ func TestLexer(t *testing.T) {
 			[]item{
 				newItem(itemIdentifier, "field"),
 				tColon,
+				tSpace,
 				newItem(itemError, `bad number syntax: "-23d"`),
+			},
+		},
+		{
+			"or values",
+			"field:(x OR y AND z)",
+			[]item{
+				newItem(itemIdentifier, "field"),
+				tColon,
+				tLparen,
+				newItem(itemIdentifier, "x"),
+				tSpace,
+				newItem(itemOr, "OR"),
+				tSpace,
+				newItem(itemIdentifier, "y"),
+				tSpace,
+				newItem(itemAnd, "AND"),
+				tSpace,
+				newItem(itemIdentifier, "z"),
+				tRparen,
+				tEOF,
+			},
+		},
+		{
+			"syntax that includes percentage and wildcard",
+			"discount_string:70%*",
+			[]item{
+				newItem(itemIdentifier, "discount_string"),
+				tColon,
+				newItem(itemNumber, "70"),
+				newItem(itemString, "%*"),
+				tEOF,
 			},
 		},
 	}

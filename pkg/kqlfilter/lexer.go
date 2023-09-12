@@ -33,6 +33,7 @@ type itemType int
 const (
 	itemError itemType = iota // error occurred; value is text of error
 	itemEOF
+	itemSpace         // run of spaces
 	itemBool          // boolean constant
 	itemString        // string (includes quotes)
 	itemIdentifier    // alphanumeric identifier
@@ -53,6 +54,7 @@ const (
 var itemName = map[itemType]string{
 	itemError:         "error",
 	itemEOF:           "EOF",
+	itemSpace:         "space",
 	itemBool:          "bool",
 	itemString:        "string",
 	itemIdentifier:    "identifier",
@@ -280,8 +282,7 @@ func lexSpace(l *lexer) stateFn {
 		}
 		l.next()
 	}
-	l.ignore()
-	return lexExpression
+	return l.emit(itemSpace)
 }
 
 // lexQuote scans a quoted string.
@@ -334,7 +335,7 @@ func (l *lexer) scanNumber() bool {
 func lexIdentifier(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
-		case isLetterOrDigit(r), r == '.':
+		case !isSpecialSymbol(r) && r != eof && !isSpace(r):
 		// absorb.
 		case r == '\\':
 			switch l.next() {
@@ -429,7 +430,7 @@ func (l *lexer) atTerminator() bool {
 		return true
 	}
 	switch r {
-	case eof, '*', '.', '>', '<', ':', ')', '(', '}', '{', '\\':
+	case eof, '*', '>', '<', ':', ')', '(', '}', '{':
 		return true
 	}
 	return false
@@ -462,4 +463,14 @@ func isSpace(r rune) bool {
 // isLetterOrDigit reports whether r is a letter, digit, or underscore.
 func isLetterOrDigit(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// isSpecialSymbol reports whether r is a special symbol.
+func isSpecialSymbol(r rune) bool {
+	switch r {
+	case '\\', '(', ')', '{', '}', ':', '<', '>', '"', '*':
+		return true
+	default:
+		return false
+	}
 }

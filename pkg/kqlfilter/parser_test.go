@@ -158,6 +158,36 @@ func TestParseAST(t *testing.T) {
 			true,
 			"",
 		},
+		{
+			"syntax that includes percentage and wildcard",
+			"discount_string:70%*",
+			false,
+			"discount_string=70%*",
+		},
+		{
+			"not syntax",
+			"not field:value",
+			false,
+			"NOT field=value",
+		},
+		{
+			"not value",
+			"field:NOT value",
+			true,
+			"",
+		},
+		{
+			"nesting error",
+			"a:{b:{c:{d:{e:{f:{g:{h:{i:{j:{k:{l:{m:{n:{o:{p:{q:{r:{s:{t:{u:{v:{w:{x:{y:{z:1}}}}}}}}}}}}}}}}}}}}}}}}}",
+			true,
+			"",
+		},
+		{
+			"nesting",
+			"a:{b:{c:{d:{e:{f:{g:{h:{i:{j:{k:{l:{m:{n:{o:{p:{q:{r:{s:{t:1}}}}}}}}}}}}}}}}}}}",
+			false,
+			"a={b={c={d={e={f={g={h={i={j={k={l={m={n={o={p={q={r={s={t=1}}}}}}}}}}}}}}}}}}}",
+		},
 	}
 
 	for _, test := range testCases {
@@ -199,5 +229,4 @@ func TestParseSimple(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
-
 }
