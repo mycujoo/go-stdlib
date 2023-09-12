@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestToSQL(t *testing.T) {
+func TestToSpannerSQL(t *testing.T) {
 	// All of those should return an error.
 	testCases := []struct {
 		name           string
@@ -32,9 +31,9 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(user_id=@GeneratedPlaceholder0)",
+			"(user_id=@KQL0)",
 			map[string]any{
-				"GeneratedPlaceholder0": 12345,
+				"KQL0": int64(12345),
 			},
 		},
 		{
@@ -51,10 +50,10 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id=@GeneratedPlaceholder0 AND email=@GeneratedPlaceholder1)",
+			"(u.user_id=@KQL0 AND email=@KQL1)",
 			map[string]any{
-				"GeneratedPlaceholder0": 12345,
-				"GeneratedPlaceholder1": "johnexamplecom",
+				"KQL0": int64(12345),
+				"KQL1": "johnexamplecom",
 			},
 		},
 		{
@@ -71,10 +70,10 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id=@GeneratedPlaceholder0 AND email=@GeneratedPlaceholder1)",
+			"(u.user_id=@KQL0 AND email=@KQL1)",
 			map[string]any{
-				"GeneratedPlaceholder0": 12345,
-				"GeneratedPlaceholder1": "*examplecom",
+				"KQL0": int64(12345),
+				"KQL1": "*examplecom",
 			},
 		},
 		{
@@ -92,14 +91,14 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(u.user_id=@GeneratedPlaceholder0 AND email LIKE @GeneratedPlaceholder1)",
+			"(u.user_id=@KQL0 AND email LIKE @KQL1)",
 			map[string]any{
-				"GeneratedPlaceholder0": 12345,
-				"GeneratedPlaceholder1": "johnexample%",
+				"KQL0": int64(12345),
+				"KQL1": "johnexample%",
 			},
 		},
 		// Disabled test, parser breaks
-		//{
+		// {
 		//	"escape percentage sign with wildcard suffix allowed",
 		//	"discount_string:70%*",
 		//  false,
@@ -110,13 +109,13 @@ func TestToSQL(t *testing.T) {
 		//		},
 		//	},
 		//	false,
-		//	"(email LIKE @GeneratedPlaceholder0)",
+		//	"(email LIKE @KQL0)",
 		//	map[string]any{
-		//		"GeneratedPlaceholder0": "70\\%%",
+		//		"KQL0": "70\\%%",
 		//	},
-		//},
+		// },
 		// Disabled test, parser breaks
-		//{
+		// {
 		//	"one integer field and one string field with wildcards allowed, illegal wildcard in middle",
 		//	"userId:12345 email:*example*com",
 		//  false,
@@ -131,11 +130,11 @@ func TestToSQL(t *testing.T) {
 		//		},
 		//	},
 		//  false,
-		//	"(u.user_id=@GeneratedPlaceholder0)",
+		//	"(u.user_id=@KQL0)",
 		//	map[string]any{
-		//		"GeneratedPlaceholder0": 12345,
+		//		"KQL0": 12345,
 		//	},
-		//},
+		// },
 		{
 			"disallowed column",
 			"userId:12345 password:qwertyuiop",
@@ -193,9 +192,9 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(state=@GeneratedPlaceholder0)",
+			"(state=@KQL0)",
 			map[string]any{
-				"GeneratedPlaceholder0": "active",
+				"KQL0": "active",
 			},
 		},
 		{
@@ -218,9 +217,9 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(state=@GeneratedPlaceholder0)",
+			"(state=@KQL0)",
 			map[string]any{
-				"GeneratedPlaceholder0": "active",
+				"KQL0": "active",
 			},
 		},
 		{
@@ -233,11 +232,11 @@ func TestToSQL(t *testing.T) {
 				"exact": {ColumnType: FilterToSpannerFieldColumnTypeBool},
 			},
 			false,
-			"(lat=@GeneratedPlaceholder0 AND lon=@GeneratedPlaceholder1 AND exact IS @GeneratedPlaceholder2)",
+			"(lat=@KQL0 AND lon=@KQL1 AND exact IS @KQL2)",
 			map[string]any{
-				"GeneratedPlaceholder0": 52.4052963,
-				"GeneratedPlaceholder1": 4.8856547,
-				"GeneratedPlaceholder2": false,
+				"KQL0": 52.4052963,
+				"KQL1": 4.8856547,
+				"KQL2": false,
 			},
 		},
 		{
@@ -253,11 +252,11 @@ func TestToSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(truthy IS @GeneratedPlaceholder0 AND falsey IS @GeneratedPlaceholder1 AND alsoTruthy IS @GeneratedPlaceholder2)",
+			"(truthy IS @KQL0 AND falsey IS @KQL1 AND alsoTruthy IS @KQL2)",
 			map[string]any{
-				"GeneratedPlaceholder0": true,
-				"GeneratedPlaceholder1": false,
-				"GeneratedPlaceholder2": true,
+				"KQL0": true,
+				"KQL1": false,
+				"KQL2": true,
 			},
 		},
 		{
@@ -274,12 +273,12 @@ func TestToSQL(t *testing.T) {
 				"date": {ColumnType: FilterToSpannerFieldColumnTypeDateTime},
 			},
 			false,
-			"(user_id>=@GeneratedPlaceholder0 AND lat<@GeneratedPlaceholder1 AND lon>@GeneratedPlaceholder2 AND date<=@GeneratedPlaceholder3)",
+			"(user_id>=@KQL0 AND lat<@KQL1 AND lon>@KQL2 AND date<=@KQL3)",
 			map[string]any{
-				"GeneratedPlaceholder0": 12345,
-				"GeneratedPlaceholder1": 50.0,
-				"GeneratedPlaceholder2": 4.1,
-				"GeneratedPlaceholder3": time.Date(2023, time.June, 1, 23, 0, 0, 200000000, time.UTC),
+				"KQL0": int64(12345),
+				"KQL1": 50.0,
+				"KQL2": 4.1,
+				"KQL3": time.Date(2023, time.June, 1, 23, 0, 0, 200000000, time.UTC),
 			},
 		},
 		{
@@ -297,10 +296,12 @@ func TestToSQL(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			f, err := Parse(test.input, test.withRanges)
+			f, errParse := Parse(test.input, test.withRanges)
 			condAnds, params, err := f.ToSpannerSQL(test.columnMap)
 			if test.expectedError {
-				require.Error(t, err)
+				if errParse == nil && err == nil {
+					t.Errorf("expected error, but got none")
+				}
 				return
 			}
 

@@ -1,7 +1,6 @@
 package kqlfilter
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -52,114 +51,100 @@ type FilterToSpannerFieldConfig struct {
 //
 // This returns a slice of SQL conditions that can be appended to an existing WHERE clause (make sure to AND these first):
 //
-//	["user_id=@GeneratedPlaceholder0", "email LIKE @GeneratedPlaceholder1"]
+//	["user_id=@KQL0", "email LIKE @KQL1"]
 //
 // and params:
 //
 //	{
-//		"@GeneratedPlaceholder0": 12345,
-//		"@GeneratedPlaceholder1": "john@example.%"
+//		"@KQL0": 12345,
+//		"@KQL1": "john@example.%"
 //	}
 //
 // Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
 func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig) ([]string, map[string]interface{}, error) {
 	var condAnds []string
 	params := map[string]interface{}{}
-	fieldCount := map[string]int{}
 
 	for i, clause := range f.Clauses {
-		if fieldConfig, ok := fieldConfigs[clause.Field]; ok {
-			fieldCount[clause.Field] += 1
-			if fieldCount[clause.Field] > 2 {
-				// A field can never be addressed more than twice (and only once for '=', but we permit that for now)
-				// Prevent this to ensure that an end-user cannot build an enormously complex query by endless field
-				// repetition.
-				return []string{}, map[string]interface{}{}, errors.New("field count maximum in filter exceeded")
-			}
-
-			placeholderName := fmt.Sprintf("%s%d", "GeneratedPlaceholder", i)
-			columnName := fieldConfig.ColumnName
-			if columnName == "" {
-				columnName = clause.Field
-			}
-			inputValue := clause.Value
-			var mappedValue interface{}
-			if fieldConfig.ValueMap != nil {
-				var err error
-				mappedValue, err = fieldConfig.ValueMap(clause.Value)
-				if err != nil {
-					return []string{}, map[string]interface{}{}, err
-				}
-			}
-			switch fieldConfig.ColumnType {
-			case FilterToSpannerFieldColumnTypeString:
-				if fieldConfig.AllowPrefixMatch {
-					useValue := inputValue
-					if mappedValue_, ok := mappedValue.(string); ok {
-						useValue = mappedValue_
-					}
-					if fieldConfig.AllowPrefixMatch && strings.HasSuffix(useValue, "*") {
-						// TODO: Handle escaped asterisk (*) characters that should not serve as wildcards
-						condAnds = append(condAnds, fmt.Sprintf("%s LIKE @%s", columnName, placeholderName))
-						escapedValue := strings.ReplaceAll(useValue, "%", "\\%")
-						params[placeholderName] = escapedValue[0:len(escapedValue)-1] + "%"
-					} else {
-						condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
-						params[placeholderName] = useValue
-					}
-				} else {
-					condAnds = append(condAnds, fmt.Sprintf("%s=@%s", columnName, placeholderName))
-					if mappedValue != nil {
-						params[placeholderName] = mappedValue
-					} else {
-						params[placeholderName] = inputValue
-					}
-				}
-			case FilterToSpannerFieldColumnTypeInt:
-				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
-				if mappedValue != nil {
-					params[placeholderName] = mappedValue
-				} else {
-					intVal, err := strconv.Atoi(inputValue)
-					if err != nil {
-						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
-					}
-					params[placeholderName] = intVal
-				}
-			case FilterToSpannerFieldColumnTypeDouble:
-				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
-				if mappedValue != nil {
-					params[placeholderName] = mappedValue
-				} else {
-					doubleVal, err := strconv.ParseFloat(inputValue, 64)
-					if err != nil {
-						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
-					}
-					params[placeholderName] = doubleVal
-				}
-			case FilterToSpannerFieldColumnTypeBool:
-				condAnds = append(condAnds, fmt.Sprintf("%s IS @%s", columnName, placeholderName))
-				if mappedValue != nil {
-					params[placeholderName] = mappedValue
-				} else {
-					boolVal, _ := strconv.ParseBool(inputValue)
-					params[placeholderName] = boolVal
-				}
-			case FilterToSpannerFieldColumnTypeDateTime:
-				condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, clause.Operator, placeholderName))
-				if mappedValue != nil {
-					params[placeholderName] = mappedValue
-				} else {
-					t, err := time.Parse(time.RFC3339, inputValue)
-					if err != nil {
-						return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
-					}
-					params[placeholderName] = t
-				}
-			}
-		} else {
+		fieldConfig, ok := fieldConfigs[clause.Field]
+		if !ok {
 			return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
 		}
+
+		placeholderName := fmt.Sprintf("%s%d", "KQL", i)
+		columnName := fieldConfig.ColumnName
+		if columnName == "" {
+			columnName = clause.Field
+		}
+		var mappedValue interface{}
+		mappedValue = clause.Value
+
+		var operator string
+		operator = clause.Operator
+
+		if fieldConfig.ValueMap != nil {
+			var err error
+			mappedValue, err = fieldConfig.ValueMap(clause.Value)
+			if err != nil {
+				return []string{}, map[string]interface{}{}, err
+			}
+		}
+		mappedString, isString := mappedValue.(string)
+		switch fieldConfig.ColumnType {
+		case FilterToSpannerFieldColumnTypeString:
+			if fieldConfig.AllowPrefixMatch && isString && strings.HasSuffix(mappedString, "*") && !strings.HasSuffix(mappedString, "\\*") {
+				operator = " LIKE "
+				// escape all instances of % in the string
+				mappedString = strings.ReplaceAll(mappedString, "%", "\\%")
+				// replace the trailing * with a %
+				mappedValue = mappedString[0:len(mappedString)-1] + "%"
+				break
+			}
+
+			operator = "="
+
+		case FilterToSpannerFieldColumnTypeInt:
+			// if mappedValue is a string - convert it to int64
+			if isString {
+				intVal, err := strconv.Atoi(mappedString)
+				if err != nil {
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter value found in field: %s", clause.Field)
+				}
+				// convert to int64 since int is not supported by spanner client
+				mappedValue = int64(intVal)
+			}
+
+		case FilterToSpannerFieldColumnTypeDouble:
+			// if mappedValue is a string - convert it to float64
+			if isString {
+				doubleVal, err := strconv.ParseFloat(mappedString, 64)
+				if err != nil {
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter value found in field: %s", clause.Field)
+				}
+				mappedValue = doubleVal
+			}
+
+		case FilterToSpannerFieldColumnTypeBool:
+			operator = " IS "
+			// if mappedValue is a string - convert it to bool
+			if isString {
+				boolVal, _ := strconv.ParseBool(mappedString)
+				mappedValue = boolVal
+			}
+
+		case FilterToSpannerFieldColumnTypeDateTime:
+			// if mappedValue is a string - convert it to time.Time
+			if isString {
+				t, err := time.Parse(time.RFC3339, mappedString)
+				if err != nil {
+					return []string{}, map[string]interface{}{}, fmt.Errorf("disallowed filter found in field: %s", clause.Field)
+				}
+				mappedValue = t
+			}
+		}
+
+		condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, operator, placeholderName))
+		params[placeholderName] = mappedValue
 	}
 
 	return condAnds, params, nil

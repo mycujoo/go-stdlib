@@ -74,25 +74,30 @@ func convertToSimpleFilter(ast Node, enableRangeOperator bool) (Filter, error) {
 
 func convertAndNode(ast *AndNode, enableRangeOperator bool) (Filter, error) {
 	var filter Filter
+	fieldCounts := make(map[string]int)
 	for _, node := range ast.Nodes {
+		var f Filter
+		var err error
 		switch n := node.(type) {
 		case *IsNode:
-			isNode, err := convertIsNode(n)
-			if err != nil {
-				return Filter{}, err
-			}
-			filter.Clauses = append(filter.Clauses, isNode.Clauses...)
+			f, err = convertIsNode(n)
 		case *RangeNode:
 			if !enableRangeOperator {
 				return Filter{}, fmt.Errorf("unsupported node type %T", ast)
 			}
-			rangeNode, err := convertRangeNode(n)
-			if err != nil {
-				return Filter{}, err
-			}
-			filter.Clauses = append(filter.Clauses, rangeNode.Clauses...)
+			f, err = convertRangeNode(n)
 		default:
 			return Filter{}, fmt.Errorf("unsupported node type %T", ast)
+		}
+		if err != nil {
+			return Filter{}, err
+		}
+		filter.Clauses = append(filter.Clauses, f.Clauses...)
+	}
+	for _, clause := range filter.Clauses {
+		fieldCounts[clause.Field]++
+		if fieldCounts[clause.Field] > 2 {
+			return Filter{}, fmt.Errorf("field count maximum in filter exceeded")
 		}
 	}
 	return filter, nil
