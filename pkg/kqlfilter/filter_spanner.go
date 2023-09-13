@@ -49,21 +49,12 @@ type FilterToSpannerFieldConfig struct {
 	// stored in the database. This should return an error when the user is providing a value that is illegal for this
 	// particular field. Defaults to using the provided value as-is.
 	MapValue func(string) (any, error)
-
-	// A function that allows mapping multiple values at once. This is useful for IN clauses.
-	// This overrides MapValue.
-	MapValues func([]string) (any, error)
 }
 
 func (f FilterToSpannerFieldConfig) mapValues(values []string) (any, error) {
 	var outputValue any
 	var err error
-	if f.MapValues != nil {
-		outputValue, err = f.MapValues(values)
-		if err != nil {
-			return nil, err
-		}
-	} else if f.MapValue != nil {
+	if f.MapValue != nil {
 		outputValue = make([]any, 0, len(values))
 		for _, value := range values {
 			mappedValue, err := f.MapValue(value)
@@ -232,7 +223,7 @@ func unwrapSlice(v any) any {
 //		"@KQL1": "T2"
 //	}
 //
-// Note: The Clause Operator is contextually used/ignored. It only works with int, double and datetime types currently.
+// Note: The Clause Operator is contextually used/ignored. It only works with INT64, FLOAT64 and TIMESTAMP types currently.
 func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig) ([]string, map[string]any, error) {
 	var condAnds []string
 	params := make(map[string]any)

@@ -255,7 +255,7 @@ func TestToSpannerSQL(t *testing.T) {
 			},
 		},
 		{
-			"double columns and bool",
+			"FLOAT64 columns and BOOL",
 			"lat:52.4052963 lon:4.8856547 exact:false",
 			false,
 			map[string]FilterToSpannerFieldConfig{
