@@ -200,6 +200,18 @@ func TestParseAST(t *testing.T) {
 			false,
 			"(state=PAYMENT_STATE_FAILED AND content_reference.id=2Ubp5JU6lfqmAWXi0I7fnl1z29y)",
 		},
+		{
+			"3 or more AND in sequence",
+			"a:1 and b:2 and c:3 and d:4 and e:5",
+			false,
+			"(a=1 AND b=2 AND c=3 AND d=4 AND e=5)",
+		},
+		{
+			"3 or more OR in sequence",
+			"a:1 or b:2 or c:3 or d:4 or e:5",
+			false,
+			"(a=1 OR b=2 OR c=3 OR d=4 OR e=5)",
+		},
 	}
 
 	for _, test := range testCases {
