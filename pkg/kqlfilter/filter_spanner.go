@@ -251,6 +251,7 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 			return nil, nil, fmt.Errorf("operator %s doesn't support multiple values in field: %s", operator, clause.Field)
 		}
 
+		whereClauseFormat := "%s%s@%s"
 		switch operator {
 		case "IN":
 			switch fieldConfig.ColumnType {
@@ -264,28 +265,32 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 				return nil, nil, fmt.Errorf("operator %s not supported for field type %s", operator, fieldConfig.ColumnType)
 			}
 
-			var sb strings.Builder
-			sb.WriteString(columnName)
-			sb.WriteString(" IN (")
-
-			ss := reflect.ValueOf(mappedValue)
-
-			for i := 0; i < ss.Len(); i++ {
-				placeholderName := fmt.Sprintf("%s%d", "KQL", paramIndex)
-				params[placeholderName] = ss.Index(i).Interface()
-
-				if i > 0 {
-					sb.WriteString(",")
-				}
-				sb.WriteString("?")
-
-				paramIndex++
-			}
-			sb.WriteString(")")
-
-			condAnds = append(condAnds, sb.String())
-
-			continue
+			whereClauseFormat = "%s %s UNNEST(@%s)"
+			//
+			//var sb strings.Builder
+			//sb.WriteString(columnName)
+			//sb.WriteString(" IN UNNEST(")
+			//
+			//ss := reflect.ValueOf(mappedValue)
+			//
+			//var paramValue []any
+			//for i := 0; i < ss.Len(); i++ {
+			//	paramValue = append(paramValue, ss.Index(i).Interface())
+			//	placeholderName := fmt.Sprintf("%s%d", "KQL", paramIndex)
+			//	params[placeholderName] = ss.Index(i).Interface()
+			//
+			//	if i > 0 {
+			//		sb.WriteString(",")
+			//	}
+			//	sb.WriteString("?")
+			//
+			//	paramIndex++
+			//}
+			//sb.WriteString(")")
+			//
+			//condAnds = append(condAnds, sb.String())
+			//
+			//continue
 		case "=":
 			// Prefix match supported only for single string
 			mappedString, isString := mappedValue.(string)
@@ -313,7 +318,7 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 		}
 
 		paramName := fmt.Sprintf("%s%d", "KQL", paramIndex)
-		condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, operator, paramName))
+		condAnds = append(condAnds, fmt.Sprintf(whereClauseFormat, columnName, operator, paramName))
 		params[paramName] = mappedValue
 		paramIndex++
 	}
