@@ -28,7 +28,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 			},
 			false,
@@ -44,7 +44,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 				"email": {
 					ColumnType: FilterToSpannerFieldColumnTypeString,
@@ -64,7 +64,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 				"email": {
 					ColumnType: FilterToSpannerFieldColumnTypeString,
@@ -84,7 +84,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 				"email": {
 					ColumnType:       FilterToSpannerFieldColumnTypeString,
@@ -121,7 +121,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": FilterToSpannerFieldConfig{
 					ColumnName: "u.user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 				"email": FilterToSpannerFieldConfig{
 					ColumnType:       FilterToSpannerFieldColumnTypeString,
@@ -174,7 +174,7 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "u.user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
 			},
 			true,
@@ -187,7 +187,7 @@ func TestToSpannerSQL(t *testing.T) {
 			false,
 			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					ValueMap: func(inputValue string) (interface{}, error) {
+					MapValue: func(inputValue string) (any, error) {
 						switch inputValue {
 						case "active":
 							return "active", nil
@@ -210,7 +210,7 @@ func TestToSpannerSQL(t *testing.T) {
 			false,
 			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					ValueMap: func(inputValue string) (interface{}, error) {
+					MapValue: func(inputValue string) (any, error) {
 						switch inputValue {
 						case "active":
 							return "active", nil
@@ -235,7 +235,7 @@ func TestToSpannerSQL(t *testing.T) {
 			false,
 			map[string]FilterToSpannerFieldConfig{
 				"state": {
-					ValueMap: func(inputValue string) (interface{}, error) {
+					MapValue: func(inputValue string) (any, error) {
 						switch inputValue {
 						case "payment_state_active":
 							return "active", nil
@@ -259,8 +259,8 @@ func TestToSpannerSQL(t *testing.T) {
 			"lat:52.4052963 lon:4.8856547 exact:false",
 			false,
 			map[string]FilterToSpannerFieldConfig{
-				"lat":   {ColumnType: FilterToSpannerFieldColumnTypeDouble},
-				"lon":   {ColumnType: FilterToSpannerFieldColumnTypeDouble},
+				"lat":   {ColumnType: FilterToSpannerFieldColumnTypeFloat64},
+				"lon":   {ColumnType: FilterToSpannerFieldColumnTypeFloat64},
 				"exact": {ColumnType: FilterToSpannerFieldColumnTypeBool},
 			},
 			false,
@@ -298,11 +298,11 @@ func TestToSpannerSQL(t *testing.T) {
 			map[string]FilterToSpannerFieldConfig{
 				"userId": {
 					ColumnName: "user_id",
-					ColumnType: FilterToSpannerFieldColumnTypeInt,
+					ColumnType: FilterToSpannerFieldColumnTypeInt64,
 				},
-				"lat":  {ColumnType: FilterToSpannerFieldColumnTypeDouble},
-				"lon":  {ColumnType: FilterToSpannerFieldColumnTypeDouble},
-				"date": {ColumnType: FilterToSpannerFieldColumnTypeDateTime},
+				"lat":  {ColumnType: FilterToSpannerFieldColumnTypeFloat64},
+				"lon":  {ColumnType: FilterToSpannerFieldColumnTypeFloat64},
+				"date": {ColumnType: FilterToSpannerFieldColumnTypeTimestamp},
 			},
 			false,
 			"(user_id>=@KQL0 AND lat<@KQL1 AND lon>@KQL2 AND date<=@KQL3)",
@@ -321,6 +321,90 @@ func TestToSpannerSQL(t *testing.T) {
 				"count": {},
 			},
 			true,
+			"",
+			map[string]any{},
+		},
+		{
+			"in query",
+			"state:(state_active OR state_canceled)",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"state": {
+					AllowMultipleValues: true,
+					MapValue: func(inputValue string) (any, error) {
+						switch inputValue {
+						case "state_active":
+							return "active", nil
+						case "state_canceled":
+							return "canceled", nil
+						case "state_expired":
+							return "expired", nil
+						}
+						return nil, errors.New("illegal value provided")
+					},
+				},
+			},
+			false,
+			"(state IN (?,?))",
+			map[string]any{
+				"KQL0": "active",
+				"KQL1": "canceled",
+			},
+		},
+		{
+			"in query - disabled",
+			"state:(active OR canceled)",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"state": {
+					AllowMultipleValues: false,
+					MapValue: func(inputValue string) (any, error) {
+						switch inputValue {
+						case "active":
+							return "active", nil
+						case "canceled":
+							return "canceled", nil
+						case "expired":
+							return "expired", nil
+						}
+						return nil, errors.New("illegal value provided")
+					},
+				},
+			},
+			true,
+			"",
+			map[string]any{},
+		},
+		{
+			"in query - int",
+			"user_id:(123 OR 321)",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"user_id": {
+					ColumnName:          "UserID",
+					ColumnType:          FilterToSpannerFieldColumnTypeInt64,
+					AllowMultipleValues: true,
+				},
+			},
+			false,
+			"(UserID IN (?,?))",
+			map[string]any{
+				"KQL0": int64(123),
+				"KQL1": int64(321),
+			},
+		},
+		{
+			"in query - bool",
+			"user_id:(true OR false)",
+			false,
+			map[string]FilterToSpannerFieldConfig{
+				"user_id": {
+					ColumnName:          "UserID",
+					ColumnType:          FilterToSpannerFieldColumnTypeBool,
+					AllowMultipleValues: true,
+				},
+			},
+			true, // operator IN not supported for field type BOOL
 			"",
 			map[string]any{},
 		},

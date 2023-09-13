@@ -285,6 +285,34 @@ func TestLexer(t *testing.T) {
 				tEOF,
 			},
 		},
+		{
+			"bool",
+			"suspended: true",
+			[]item{
+				newItem(itemString, "suspended"),
+				tColon,
+				tSpace,
+				newItem(itemBool, "true"),
+				tEOF,
+			},
+		},
+		{
+			"multivalue bool",
+			"suspended: (true OR false)",
+			[]item{
+				newItem(itemString, "suspended"),
+				tColon,
+				tSpace,
+				tLparen,
+				newItem(itemBool, "true"),
+				tSpace,
+				newItem(itemOr, "OR"),
+				tSpace,
+				newItem(itemBool, "false"),
+				tRparen,
+				tEOF,
+			},
+		},
 	}
 
 	for _, test := range testCases {

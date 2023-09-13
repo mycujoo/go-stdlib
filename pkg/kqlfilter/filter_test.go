@@ -33,7 +33,7 @@ func TestParse(t *testing.T) {
 					{
 						Field:    "field",
 						Operator: "=",
-						Value:    "value",
+						Values:   []string{"value"},
 					},
 				},
 			},
@@ -48,12 +48,12 @@ func TestParse(t *testing.T) {
 					{
 						Field:    "field",
 						Operator: "=",
-						Value:    "value",
+						Values:   []string{"value"},
 					},
 					{
 						Field:    "another",
 						Operator: "=",
-						Value:    "second",
+						Values:   []string{"second"},
 					},
 				},
 			},
@@ -68,12 +68,12 @@ func TestParse(t *testing.T) {
 					{
 						Field:    "field",
 						Operator: "=",
-						Value:    "value",
+						Values:   []string{"value"},
 					},
 					{
 						Field:    "another",
 						Operator: "=",
-						Value:    "second",
+						Values:   []string{"second"},
 					},
 				},
 			},
@@ -86,11 +86,19 @@ func TestParse(t *testing.T) {
 			Filter{},
 		},
 		{
-			"or values not supported",
+			"or values are supported",
 			"field:(value OR second)",
 			false,
-			true,
-			Filter{},
+			false,
+			Filter{
+				Clauses: []Clause{
+					{
+						Field:    "field",
+						Operator: "IN",
+						Values:   []string{"value", "second"},
+					},
+				},
+			},
 		},
 		{
 			"one field with range operator",
@@ -102,7 +110,7 @@ func TestParse(t *testing.T) {
 					{
 						Field:    "field",
 						Operator: ">=",
-						Value:    "value",
+						Values:   []string{"value"},
 					},
 				},
 			},
@@ -124,12 +132,12 @@ func TestParse(t *testing.T) {
 					{
 						Field:    "amount",
 						Operator: ">=",
-						Value:    "1",
+						Values:   []string{"1"},
 					},
 					{
 						Field:    "amount",
 						Operator: "<",
-						Value:    "5",
+						Values:   []string{"5"},
 					},
 				},
 			},

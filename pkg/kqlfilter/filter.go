@@ -11,9 +11,12 @@ type Filter struct {
 
 type Clause struct {
 	Field string
-	// One of the following: `=`, `<`, `<=`, `>`, `>=`
+	// One of the following: `=`, `<`, `<=`, `>`, `>=`, `IN`
 	Operator string
-	Value    string
+	// List of values for the clause.
+	// For `IN` operator, this is a list of values to match against.
+	// For other operators, this is a list of one string.
+	Values []string
 }
 
 // Parse parses a filter string into a Filter struct.
@@ -25,7 +28,7 @@ func Parse(input string, enableRangeOperator bool) (Filter, error) {
 	if strings.TrimSpace(input) == "" {
 		return Filter{}, nil
 	}
-	ast, err := ParseAST(input, DisableComplexExpressions())
+	ast, err := ParseAST(input, WithMaxDepth(2))
 	if err != nil {
 		return Filter{}, err
 	}
@@ -127,21 +130,27 @@ func convertAndNode(ast *AndNode, enableRangeOperator bool) (Filter, error) {
 }
 
 func convertIsNode(ast *IsNode) (Filter, error) {
-	var value string
+	clause := Clause{
+		Field:    ast.Identifier,
+		Operator: "=",
+	}
 	switch n := ast.Value.(type) {
 	case *LiteralNode:
-		value = n.Value
+		clause.Values = []string{n.Value}
+	case *OrNode:
+		clause.Operator = "IN"
+		for _, node := range n.Nodes {
+			literalNode, ok := node.(*LiteralNode)
+			if !ok {
+				return Filter{}, fmt.Errorf("unsupported node type %T", node)
+			}
+			clause.Values = append(clause.Values, literalNode.Value)
+		}
 	default:
 		return Filter{}, fmt.Errorf("unsupported node type %T", ast.Value)
 	}
 	return Filter{
-		Clauses: []Clause{
-			{
-				Field:    ast.Identifier,
-				Operator: "=",
-				Value:    value,
-			},
-		},
+		Clauses: []Clause{clause},
 	}, nil
 }
 
@@ -162,7 +171,7 @@ func convertRangeNode(ast *RangeNode) (Filter, error) {
 			{
 				Field:    ast.Identifier,
 				Operator: operator,
-				Value:    value,
+				Values:   []string{value},
 			},
 		},
 	}, nil

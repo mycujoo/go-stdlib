@@ -243,6 +243,10 @@ func (p *parser) parseExpression() Node {
 			return p.newLiteralNode(idItem.pos, idItem.val)
 		}
 
+	case itemBool:
+		value := p.next()
+		return p.newLiteralNode(value.pos, value.val)
+
 	default:
 		p.unexpected(p.peek(), "expression")
 		return nil
