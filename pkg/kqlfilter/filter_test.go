@@ -142,6 +142,41 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"3 or more and in a sequence",
+			"a:1 and b:2 and c:3 and d:4 and e:6",
+			false,
+			false,
+			Filter{
+				Clauses: []Clause{
+					{
+						Field:    "a",
+						Operator: "=",
+						Values:   []string{"1"},
+					},
+					{
+						Field:    "b",
+						Operator: "=",
+						Values:   []string{"2"},
+					},
+					{
+						Field:    "c",
+						Operator: "=",
+						Values:   []string{"3"},
+					},
+					{
+						Field:    "d",
+						Operator: "=",
+						Values:   []string{"4"},
+					},
+					{
+						Field:    "e",
+						Operator: "=",
+						Values:   []string{"6"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range testCases {

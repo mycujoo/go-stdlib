@@ -168,6 +168,7 @@ func (p *parser) parseAnd() Node {
 		p.next()
 		p.eatSpace()
 		not = p.parseNot()
+		p.eatSpace()
 		n.append(not)
 	}
 	// simplify if only one node

@@ -212,6 +212,18 @@ func TestParseAST(t *testing.T) {
 			false,
 			"suspended=(true OR false)",
 		},
+		{
+			"3 or more AND in a sequence",
+			"a:1 and b:2 and c:3 and d:4 and e:6",
+			false,
+			"(a=1 AND b=2 AND c=3 AND d=4 AND e=6)",
+		},
+		{
+			"3 or more AND in a sequence + implicit AND",
+			"a:1 and b:2 and c:3 and d:4 e:6",
+			false,
+			"((a=1 AND b=2 AND c=3 AND d=4) AND e=6)",
+		},
 	}
 
 	for _, test := range testCases {
