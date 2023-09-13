@@ -330,6 +330,7 @@ func TestToSpannerSQL(t *testing.T) {
 			false,
 			map[string]FilterToSpannerFieldConfig{
 				"state": {
+					ColumnType:          FilterToSpannerFieldColumnTypeString,
 					AllowMultipleValues: true,
 					MapValue: func(inputValue string) (any, error) {
 						switch inputValue {
@@ -345,10 +346,9 @@ func TestToSpannerSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(state IN (?,?))",
+			"(state IN UNNEST(@KQL0))",
 			map[string]any{
-				"KQL0": "active",
-				"KQL1": "canceled",
+				"KQL0": []string{"active", "canceled"},
 			},
 		},
 		{
@@ -387,10 +387,9 @@ func TestToSpannerSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(UserID IN (?,?))",
+			"(UserID IN UNNEST(@KQL0))",
 			map[string]any{
-				"KQL0": int64(123),
-				"KQL1": int64(321),
+				"KQL0": []int64{123, 321},
 			},
 		},
 		{

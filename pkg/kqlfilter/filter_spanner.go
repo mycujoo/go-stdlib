@@ -169,10 +169,9 @@ func (f FilterToSpannerFieldConfig) convertValue(value string) (any, error) {
 
 func unwrapSlice(v any) any {
 	if reflect.TypeOf(v).Kind() == reflect.Slice {
-		if reflect.ValueOf(v).Len() != 1 {
-			return v
+		if reflect.ValueOf(v).Len() == 1 {
+			return reflect.ValueOf(v).Index(0).Interface()
 		}
-		return reflect.ValueOf(v).Index(0).Interface()
 	}
 	return v
 }
@@ -251,41 +250,26 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 			return nil, nil, fmt.Errorf("operator %s doesn't support multiple values in field: %s", operator, clause.Field)
 		}
 
+		whereClauseFormat := "%s%s@%s"
 		switch operator {
 		case "IN":
 			switch fieldConfig.ColumnType {
-			case
-				FilterToSpannerFieldColumnTypeString,
-				FilterToSpannerFieldColumnTypeInt64,
-				FilterToSpannerFieldColumnTypeFloat64,
-				FilterToSpannerFieldColumnTypeTimestamp:
-				break
+			case FilterToSpannerFieldColumnTypeString:
+				mappedValue, err = parseAnyToSlice[string](mappedValue)
+			case FilterToSpannerFieldColumnTypeInt64:
+				mappedValue, err = parseAnyToSlice[int64](mappedValue)
+			case FilterToSpannerFieldColumnTypeFloat64:
+				mappedValue, err = parseAnyToSlice[float64](mappedValue)
+			case FilterToSpannerFieldColumnTypeTimestamp:
+				mappedValue, err = parseAnyToSlice[time.Time](mappedValue)
 			default:
 				return nil, nil, fmt.Errorf("operator %s not supported for field type %s", operator, fieldConfig.ColumnType)
 			}
-
-			var sb strings.Builder
-			sb.WriteString(columnName)
-			sb.WriteString(" IN (")
-
-			ss := reflect.ValueOf(mappedValue)
-
-			for i := 0; i < ss.Len(); i++ {
-				placeholderName := fmt.Sprintf("%s%d", "KQL", paramIndex)
-				params[placeholderName] = ss.Index(i).Interface()
-
-				if i > 0 {
-					sb.WriteString(",")
-				}
-				sb.WriteString("?")
-
-				paramIndex++
+			if err != nil {
+				return nil, nil, err
 			}
-			sb.WriteString(")")
 
-			condAnds = append(condAnds, sb.String())
-
-			continue
+			whereClauseFormat = "%s %s UNNEST(@%s)"
 		case "=":
 			// Prefix match supported only for single string
 			mappedString, isString := mappedValue.(string)
@@ -313,10 +297,34 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 		}
 
 		paramName := fmt.Sprintf("%s%d", "KQL", paramIndex)
-		condAnds = append(condAnds, fmt.Sprintf("%s%s@%s", columnName, operator, paramName))
+		condAnds = append(condAnds, fmt.Sprintf(whereClauseFormat, columnName, operator, paramName))
 		params[paramName] = mappedValue
 		paramIndex++
 	}
 
 	return condAnds, params, nil
+}
+
+func parseAnyToSlice[T any](s any) ([]T, error) {
+	if s == nil {
+		return nil, nil
+	}
+	switch sVal := s.(type) {
+	case T:
+		return []T{sVal}, nil
+	case []T:
+		return sVal, nil
+	case []any:
+		var typeSlice []T
+		for i := range sVal {
+			typeVal, ok := sVal[i].(T)
+			if !ok {
+				return nil, fmt.Errorf("values' type in any slice doesn't match the expectation")
+			}
+			typeSlice = append(typeSlice, typeVal)
+		}
+		return typeSlice, nil
+	default:
+		return nil, fmt.Errorf("cannot parse input to a slice")
+	}
 }
