@@ -85,6 +85,16 @@ func (f FilterToSpannerFieldConfig) mapValues(values []string) (any, error) {
 	// If output value is a slice of strings, convert each value in the slice if needed
 	case []string:
 		switch f.ColumnType {
+		case FilterToSpannerFieldColumnTypeString:
+			outSlice := make([]string, len(ov))
+			for i, v := range ov {
+				val, err := f.convertValue(v)
+				if err != nil {
+					return nil, err
+				}
+				outSlice[i] = val.(string)
+			}
+			outputValue = outSlice
 		case FilterToSpannerFieldColumnTypeInt64:
 			outSlice := make([]int64, len(ov))
 			for i, v := range ov {
@@ -169,10 +179,9 @@ func (f FilterToSpannerFieldConfig) convertValue(value string) (any, error) {
 
 func unwrapSlice(v any) any {
 	if reflect.TypeOf(v).Kind() == reflect.Slice {
-		if reflect.ValueOf(v).Len() != 1 {
-			return v
+		if reflect.ValueOf(v).Len() == 1 {
+			return reflect.ValueOf(v).Index(0).Interface()
 		}
-		return reflect.ValueOf(v).Index(0).Interface()
 	}
 	return v
 }
@@ -255,42 +264,79 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 		switch operator {
 		case "IN":
 			switch fieldConfig.ColumnType {
-			case
-				FilterToSpannerFieldColumnTypeString,
-				FilterToSpannerFieldColumnTypeInt64,
-				FilterToSpannerFieldColumnTypeFloat64,
-				FilterToSpannerFieldColumnTypeTimestamp:
-				break
+			case FilterToSpannerFieldColumnTypeString:
+				switch mappedValueSlice := mappedValue.(type) {
+				case []string:
+					mappedValue = mappedValueSlice
+				case []any:
+					mappedValueStringSlice := make([]string, 0, len(mappedValueSlice))
+					for _, v := range mappedValueSlice {
+						vStr, ok := v.(string)
+						if !ok {
+							return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+						}
+						mappedValueStringSlice = append(mappedValueStringSlice, vStr)
+					}
+					mappedValue = mappedValueStringSlice
+				default:
+					return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+				}
+			case FilterToSpannerFieldColumnTypeInt64:
+				switch mappedValueSlice := mappedValue.(type) {
+				case []int64:
+					mappedValue = mappedValueSlice
+				case []any:
+					mappedValueInt64Slice := make([]int64, 0, len(mappedValueSlice))
+					for _, v := range mappedValueSlice {
+						vStr, ok := v.(int64)
+						if !ok {
+							return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+						}
+						mappedValueInt64Slice = append(mappedValueInt64Slice, vStr)
+					}
+					mappedValue = mappedValueInt64Slice
+				default:
+					return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+				}
+			case FilterToSpannerFieldColumnTypeFloat64:
+				switch mappedValueSlice := mappedValue.(type) {
+				case []float64:
+					mappedValue = mappedValueSlice
+				case []any:
+					mappedValueFloat64Slice := make([]float64, 0, len(mappedValueSlice))
+					for _, v := range mappedValueSlice {
+						vStr, ok := v.(float64)
+						if !ok {
+							return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+						}
+						mappedValueFloat64Slice = append(mappedValueFloat64Slice, vStr)
+					}
+					mappedValue = mappedValueFloat64Slice
+				default:
+					return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+				}
+			case FilterToSpannerFieldColumnTypeTimestamp:
+				switch mappedValueSlice := mappedValue.(type) {
+				case []time.Time:
+					mappedValue = mappedValueSlice
+				case []any:
+					mappedValueTimeSlice := make([]time.Time, 0, len(mappedValueSlice))
+					for _, v := range mappedValueSlice {
+						vStr, ok := v.(time.Time)
+						if !ok {
+							return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+						}
+						mappedValueTimeSlice = append(mappedValueTimeSlice, vStr)
+					}
+					mappedValue = mappedValueTimeSlice
+				default:
+					return nil, nil, fmt.Errorf("value type doesn't match the column type, value: [%+v], value type: [%+v], column type: [%s]\n", mappedValue, reflect.TypeOf(mappedValue), fieldConfig.ColumnType)
+				}
 			default:
 				return nil, nil, fmt.Errorf("operator %s not supported for field type %s", operator, fieldConfig.ColumnType)
 			}
 
 			whereClauseFormat = "%s %s UNNEST(@%s)"
-			//
-			//var sb strings.Builder
-			//sb.WriteString(columnName)
-			//sb.WriteString(" IN UNNEST(")
-			//
-			//ss := reflect.ValueOf(mappedValue)
-			//
-			//var paramValue []any
-			//for i := 0; i < ss.Len(); i++ {
-			//	paramValue = append(paramValue, ss.Index(i).Interface())
-			//	placeholderName := fmt.Sprintf("%s%d", "KQL", paramIndex)
-			//	params[placeholderName] = ss.Index(i).Interface()
-			//
-			//	if i > 0 {
-			//		sb.WriteString(",")
-			//	}
-			//	sb.WriteString("?")
-			//
-			//	paramIndex++
-			//}
-			//sb.WriteString(")")
-			//
-			//condAnds = append(condAnds, sb.String())
-			//
-			//continue
 		case "=":
 			// Prefix match supported only for single string
 			mappedString, isString := mappedValue.(string)
