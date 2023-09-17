@@ -1,7 +1,6 @@
 package kqlfilter
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +63,7 @@ type FilterToSquirrelSqlFieldConfig struct {
 //
 // which will let you get the final sql where conditions like:
 //
-// ...... WHERE user_id = 123456 AND status in ["active", "frozen", "deleted"] .....
+// ...... WHERE user_id = 123456 AND status in ("active","frozen","deleted") .....
 //
 // To query with Full Test Search, the column type must be FilterToSquirrelSqlFieldColumnTypeString and the Operator must be "=", and the
 // column name should be the corresponding column name in which you store the search tokens
@@ -88,22 +87,27 @@ type FilterToSquirrelSqlFieldConfig struct {
 //	...... WHERE title_search_token @@ to_tsquery("Monday & Wednesday & Sunday") ......
 //
 // Note: the input timestamp format should always be time.RFC3339Nano
+var unknownFieldErr = errors.Errorf("unknown field")
+
 func (f Filter) ToSquirrelSql(stmt sq.SelectBuilder, fieldConfigs map[string]FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	var err error
 
-	for _, clause := range f.Clauses {
+	for i, clause := range f.Clauses {
 		fieldConfig, ok := fieldConfigs[clause.Field]
 		if !ok {
-			return stmt, fmt.Errorf("unknown field: %s", clause.Field)
+			return stmt, errors.Wrapf(unknownFieldErr, "unknown field: %s", clause.Field)
 		}
 
 		stmt, err = clause.ToSquirrelSql(stmt, fieldConfig)
 		if err != nil {
-			return stmt, errors.Wrapf(err, "failed to parse clause %d to squirrel sql statement")
+			return stmt, errors.Wrapf(err, "failed to parse clause %d to squirrel sql statement", i)
 		}
 	}
 	return stmt, nil
 }
+
+var valueConvertErr = errors.Errorf("value convert error") // used in test cases
+var columnTypeErr = errors.Errorf("unexpected column type")
 
 func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	var err error
@@ -136,9 +140,6 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		rawValues = mappedValues
 	}
 
-	if len(c.Values) == 0 {
-		return stmt, errors.Errorf("no values provided")
-	}
 	switch config.ColumnType {
 	case FilterToSquirrelSqlFieldColumnTypeString:
 		stmt, err = buildStmtByOperator[string](stmt, columnName, c.Operator, rawValues, config)
@@ -147,7 +148,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		for i, v := range rawValues {
 			nativeValue, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				return stmt, fmt.Errorf("failed to convert value %s (index %d in filter c values) to int64", v, i)
+				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to int64", v, i)
 			}
 			nativeValues = append(nativeValues, nativeValue)
 		}
@@ -157,7 +158,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		for i, v := range rawValues {
 			nativeValue, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return stmt, fmt.Errorf("failed to convert value %s (index %d in filter c values) to float64", v, i)
+				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to float64", v, i)
 			}
 			nativeValues = append(nativeValues, nativeValue)
 		}
@@ -167,7 +168,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		for i, v := range rawValues {
 			nativeValue, err := strconv.ParseBool(v)
 			if err != nil {
-				return stmt, fmt.Errorf("failed to convert value %s (index %d in filter c values) to bool", v, i)
+				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to bool", v, i)
 			}
 			nativeValues = append(nativeValues, nativeValue)
 		}
@@ -177,13 +178,13 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		for i, v := range rawValues {
 			nativeValue, err := time.Parse(time.RFC3339Nano, v)
 			if err != nil {
-				return stmt, fmt.Errorf("failed to convert value %s (index %d in filter c values) to time.Time", v, i)
+				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to time.Time", v, i)
 			}
 			nativeValues = append(nativeValues, nativeValue)
 		}
 		stmt, err = buildStmtByOperator[time.Time](stmt, columnName, c.Operator, nativeValues, config)
 	default:
-		return stmt, fmt.Errorf("invalid column type %d in field config %s", config.ColumnType, c.Field)
+		return stmt, errors.Wrapf(columnTypeErr, "invalid column type %d in field config %s", config.ColumnType, c.Field)
 	}
 
 	if err != nil {
@@ -192,16 +193,23 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	return stmt, nil
 }
 
+var emptyValuesErr = errors.Errorf("no values provided")
+var valuesNumError = errors.Errorf("wrong values num")
+var operatorError = errors.Errorf("unsupported operator")
+
 func buildStmtByOperator[T string | int64 | float64 | bool | time.Time](stmt sq.SelectBuilder, columnName string, op string, values []T, config FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	switch op {
 	case "IN":
-		if len(values) == 0 || (len(values) > 1 && !config.AllowMultipleValues) {
-			return stmt, errors.Errorf("values num %d doesn't match the operator %s", len(values), op)
+		if len(values) == 0 {
+			return stmt, emptyValuesErr
+		}
+		if len(values) > 1 && !config.AllowMultipleValues {
+			return stmt, errors.Wrapf(valuesNumError, "values num %d doesn't match the operator %s", len(values), op)
 		}
 		stmt = stmt.Where(sq.Eq{columnName: values})
 	case "=", ">", ">=", "<", "<=":
 		if len(values) != 1 {
-			return stmt, errors.Errorf("values num %d doesn't match the operator %s", len(values), op)
+			return stmt, errors.Wrapf(valuesNumError, "values num %d doesn't match the operator %s", len(values), op)
 		}
 		switch op {
 		case "=":
@@ -221,7 +229,7 @@ func buildStmtByOperator[T string | int64 | float64 | bool | time.Time](stmt sq.
 			stmt = stmt.Where(sq.LtOrEq{columnName: values[0]})
 		}
 	default:
-		return stmt, fmt.Errorf("unsupported operator %s", op)
+		return stmt, errors.Wrapf(operatorError, "unsupported operator %s", op)
 	}
 	return stmt, nil
 }
