@@ -134,12 +134,11 @@ func (f FilterToSpannerFieldConfig) mapValues(values []string) (any, error) {
 func (f FilterToSpannerFieldConfig) convertValue(value string) (any, error) {
 	switch f.ColumnType {
 	case FilterToSpannerFieldColumnTypeInt64:
-		intVal, err := strconv.Atoi(value)
+		intVal, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid INT64 value: %w", err)
 		}
-		// convert to int64 since int is not supported by spanner client
-		return int64(intVal), nil
+		return intVal, nil
 
 	case FilterToSpannerFieldColumnTypeFloat64:
 
