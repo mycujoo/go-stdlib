@@ -35,7 +35,7 @@ type FilterToSquirrelSqlFieldConfig struct {
 	MapValue func(string) (string, error)
 	// A function that handle parsing the sql statement by itself.
 	// If set, all other fields in the config will be ignored
-	CustomParser func(stmt sq.SelectBuilder, operator string, values []string) (sq.SelectBuilder, error)
+	CustomBuilder func(stmt sq.SelectBuilder, operator string, values []string) (sq.SelectBuilder, error)
 }
 
 // ToSquirrelSql parses a Filter and attach the result the given squirrel sql select builder.
@@ -112,8 +112,8 @@ var columnTypeErr = errors.Errorf("unexpected column type")
 func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	var err error
 	// use customer parser if provided
-	if config.CustomParser != nil {
-		stmt, err = config.CustomParser(stmt, c.Operator, c.Values)
+	if config.CustomBuilder != nil {
+		stmt, err = config.CustomBuilder(stmt, c.Operator, c.Values)
 		if err != nil {
 			return stmt, err
 		}

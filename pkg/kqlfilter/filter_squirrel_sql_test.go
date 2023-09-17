@@ -240,7 +240,7 @@ func TestToSquirrelSql(t *testing.T) {
 			map[string]FilterToSquirrelSqlFieldConfig{
 				"age": {
 					ColumnName: "age",
-					CustomParser: func(stmt sq.SelectBuilder, operator string, values []string) (sq.SelectBuilder, error) {
+					CustomBuilder: func(stmt sq.SelectBuilder, operator string, values []string) (sq.SelectBuilder, error) {
 						for i := range values {
 							vInt64, err := strconv.ParseInt(values[i], 10, 64)
 							if err != nil {
