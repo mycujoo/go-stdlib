@@ -24,9 +24,9 @@ type FilterToSquirrelSqlFieldConfig struct {
 	ColumnName string
 	// SQL column type. Defaults to FilterToSquirrelSqlFieldColumnTypeString.
 	ColumnType FilterToSquirrelSqlFieldColumnType
-	// Allow full text search
-	// Only applicable for FilterToSquirrelSqlFieldColumnTypeString. Defaults to false.
-	AllowFTS bool
+	// Allow prefix matching when a wildcard (`*`) is present at the end of a string.
+	// Only applicable for FilterToSpannerFieldColumnTypeString. Defaults to false.
+	AllowPrefixMatch bool
 	// Allow multiple values for this field. Defaults to false.
 	AllowMultipleValues bool
 	// A function that takes a string value as provided by the user and converts it to `any` result that matches how it is
@@ -213,9 +213,12 @@ func buildStmtByOperator[T string | int64 | float64 | bool | time.Time](stmt sq.
 		}
 		switch op {
 		case "=":
-			if vStr, ok := any(values[0]).(string); ok && config.AllowFTS {
-				search := strings.ReplaceAll(vStr, " ", " & ")
-				stmt = stmt.Where(sq.Expr(columnName+" @@ to_tsquery(?)", search))
+			if vStr, ok := any(values[0]).(string); ok && config.AllowPrefixMatch && strings.HasSuffix(vStr, "*") && !strings.HasSuffix(vStr, `\*`) {
+				vStr = vStr[:len(vStr)-1]                  // trim the suffix * ( don't use the TrimRightFunc because it'll also remove the first start from suffix "**"
+				vStr = strings.ReplaceAll(vStr, `\`, `\\`) // escape all `\`
+				vStr = strings.ReplaceAll(vStr, `%`, `\%`) // escape all `%`
+				vStr = strings.ReplaceAll(vStr, `_`, `\_`) // escape all `_`
+				stmt = stmt.Where(sq.Like{columnName: vStr + "%"})
 			} else {
 				stmt = stmt.Where(sq.Eq{columnName: values[0]})
 			}

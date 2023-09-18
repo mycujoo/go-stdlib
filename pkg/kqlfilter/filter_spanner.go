@@ -274,8 +274,12 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 			mappedString, isString := mappedValue.(string)
 			if fieldConfig.AllowPrefixMatch && isString && strings.HasSuffix(mappedString, "*") && !strings.HasSuffix(mappedString, "\\*") {
 				operator = " LIKE "
+				// escape all instances of \ in the string
+				mappedString = strings.ReplaceAll(mappedString, `\`, `\\`)
+				// escape all instances of _ in the string
+				mappedString = strings.ReplaceAll(mappedString, `_`, `\_`)
 				// escape all instances of % in the string
-				mappedString = strings.ReplaceAll(mappedString, "%", "\\%")
+				mappedString = strings.ReplaceAll(mappedString, `%`, `\%`)
 				// replace the trailing * with a %
 				mappedValue = mappedString[0:len(mappedString)-1] + "%"
 				break

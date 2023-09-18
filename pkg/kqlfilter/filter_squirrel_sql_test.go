@@ -138,19 +138,19 @@ func TestToSquirrelSql(t *testing.T) {
 			[]any{"Monday", "Tuesday"},
 		},
 		{
-			"one string field with FTS",
-			"self_intro:\"Juice Baseball\"",
+			"one string field with prefix matching",
+			`self_intro:"Monday_%a\\_\\%\\**"`,
 			true,
 			map[string]FilterToSquirrelSqlFieldConfig{
 				"self_intro": {
-					ColumnName: "self_intro_search_token",
-					ColumnType: FilterToSpannerFieldColumnTypeString,
-					AllowFTS:   true,
+					ColumnName:       "self_intro",
+					ColumnType:       FilterToSpannerFieldColumnTypeString,
+					AllowPrefixMatch: true,
 				},
 			},
 			nil,
-			"SELECT * FROM users WHERE self_intro_search_token @@ to_tsquery(?)",
-			[]any{"Juice & Baseball"},
+			"SELECT * FROM users WHERE self_intro LIKE ?",
+			[]any{`Monday\_\%a\\\_\\\%\\*%`},
 		},
 		{
 			"one string field with values map",
