@@ -29,9 +29,9 @@ type FilterToSquirrelSqlFieldConfig struct {
 	AllowPrefixMatch bool
 	// Allow multiple values for this field. Defaults to false.
 	AllowMultipleValues bool
-	// A function that takes a string value as provided by the user and converts it to `any` result that matches how it is
-	// stored in the database. This should return an error when the user is providing a value that is illegal for this
-	// particular field. Defaults to using the provided value as-is.
+	// A function that takes a string value as provided by the user and converts it to string result that matches how it
+	// should be as users' input. This should return an error when the user is providing a value that is illegal or unexpected
+	// for this particular field. Defaults to using the provided value as-is.
 	MapValue func(string) (string, error)
 	// A function that handle parsing the sql statement by itself.
 	// If set, all other fields in the config will be ignored
