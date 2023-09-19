@@ -322,7 +322,7 @@ func parseAnyToSlice[T any](s any) ([]T, error) {
 		for i := range sVal {
 			typeVal, ok := sVal[i].(T)
 			if !ok {
-				return nil, fmt.Errorf("values' type in any slice doesn't match the expectation")
+				return nil, fmt.Errorf("values' type in any slice doesn't match the expectation, value type: [%+v], expect: [%+v]", reflect.TypeOf(sVal[i]), reflect.TypeOf(*new(T)))
 			}
 			typeSlice = append(typeSlice, typeVal)
 		}
