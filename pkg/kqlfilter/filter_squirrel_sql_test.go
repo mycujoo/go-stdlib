@@ -206,20 +206,6 @@ func TestToSquirrelSql(t *testing.T) {
 			nil,
 		},
 		{
-			"column type error",
-			"age:Beau",
-			true,
-			map[string]FilterToSquirrelSqlFieldConfig{
-				"age": {
-					ColumnName: "age",
-					ColumnType: FilterToSquirrelSqlFieldColumnType(99),
-				},
-			},
-			columnTypeErr,
-			"",
-			nil,
-		},
-		{
 			"wrong values number",
 			"age: (1 OR 2)",
 			true,

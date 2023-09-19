@@ -107,7 +107,6 @@ func (f Filter) ToSquirrelSql(stmt sq.SelectBuilder, fieldConfigs map[string]Fil
 }
 
 var valueConvertErr = errors.Errorf("value convert error") // used in test cases
-var columnTypeErr = errors.Errorf("unexpected column type")
 
 func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	var err error
@@ -141,8 +140,6 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	}
 
 	switch config.ColumnType {
-	case FilterToSquirrelSqlFieldColumnTypeString:
-		stmt, err = buildStmtByOperator[string](stmt, columnName, c.Operator, rawValues, config)
 	case FilterToSquirrelSqlFieldColumnTypeInt:
 		nativeValues := make([]int64, 0, len(rawValues))
 		for i, v := range rawValues {
@@ -184,7 +181,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		}
 		stmt, err = buildStmtByOperator[time.Time](stmt, columnName, c.Operator, nativeValues, config)
 	default:
-		return stmt, errors.Wrapf(columnTypeErr, "invalid column type %d in field config %s", config.ColumnType, c.Field)
+		stmt, err = buildStmtByOperator[string](stmt, columnName, c.Operator, rawValues, config)
 	}
 
 	if err != nil {
