@@ -2,7 +2,10 @@ package kqlfilter
 
 import (
 	"fmt"
+	"os"
+	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -153,7 +156,7 @@ func TestToSquirrelSql(t *testing.T) {
 			[]any{`Monday\_\%a\\\_\\\%\\*%`},
 		},
 		{
-			"one string field with values map",
+			"one string field with values map 1",
 			"favorite_day:(Monday OR Tuesday)",
 			true,
 			map[string]FilterToSquirrelSqlFieldConfig{
@@ -161,7 +164,7 @@ func TestToSquirrelSql(t *testing.T) {
 					ColumnName:          "favorite_day",
 					ColumnType:          FilterToSpannerFieldColumnTypeString,
 					AllowMultipleValues: true,
-					MapValue: func(s string) (string, error) {
+					MapValue: func(s string) (any, error) {
 						switch s {
 						case "Monday":
 							return "monday", nil
@@ -176,6 +179,29 @@ func TestToSquirrelSql(t *testing.T) {
 			nil,
 			"SELECT * FROM users WHERE favorite_day IN (?,?)",
 			[]any{"monday", "tuesday"},
+		},
+		{
+			"one string field with values map 2",
+			"before< now",
+			true,
+			map[string]FilterToSquirrelSqlFieldConfig{
+				"before": {
+					ColumnName:          "create_time",
+					ColumnType:          FilterToSpannerFieldColumnTypeTimestamp,
+					AllowMultipleValues: true,
+					MapValue: func(s string) (any, error) {
+						switch s {
+						case "now":
+							return time.Parse(time.RFC3339Nano, "2023-01-01T00:00:00.000000000Z")
+						default:
+							return "", fmt.Errorf("wrong value")
+						}
+					},
+				},
+			},
+			nil,
+			"SELECT * FROM users WHERE create_time < ?",
+			[]any{time.Date(2023, 01, 01, 00, 00, 00, 00, time.UTC)},
 		},
 		{
 			"unknown field",
@@ -257,5 +283,168 @@ func TestToSquirrelSql(t *testing.T) {
 				require.Equal(t, test.expectedArgs, args)
 			}
 		})
+	}
+}
+
+func TestAny2Int(t *testing.T) {
+	successCases := []any{
+		"1",
+		int(1),
+		int64(1),
+		int32(1),
+		int16(1),
+		int8(1),
+		uint(1),
+		uint64(1),
+		uint32(1),
+		uint16(1),
+		uint8(1),
+		float64(1),
+		float32(1),
+	}
+	for index, c := range successCases {
+		i, err := any2Int64(c)
+		require.NoError(t, err)
+		require.Equalf(t, int64(1), i, "%d: %+v\n", index, reflect.TypeOf(c))
+	}
+	convertErrorCases := []any{
+		"asdf",
+		"1.1.1.1",
+		"1.1",
+	}
+	for _, c := range convertErrorCases {
+		_, err := any2Int64(c)
+		require.ErrorIs(t, err, valueConvertErr)
+	}
+	unexpectedValueTypeErrorCases := []any{
+		os.File{},
+		strings.Builder{},
+		time.Time{},
+	}
+	for _, c := range unexpectedValueTypeErrorCases {
+		_, err := any2Int64(c)
+		require.ErrorIs(t, err, unexpectedValueTypeErr)
+	}
+}
+
+func TestAny2Float(t *testing.T) {
+	successCases := []any{
+		"1",
+		int(1),
+		int64(1),
+		int32(1),
+		int16(1),
+		int8(1),
+		uint(1),
+		uint64(1),
+		uint32(1),
+		uint16(1),
+		uint8(1),
+		float64(1),
+		float32(1),
+	}
+	for index, c := range successCases {
+		i, err := any2Float64(c)
+		require.NoError(t, err)
+		require.Equalf(t, float64(1), i, "%d: %+v\n", index, reflect.TypeOf(c))
+	}
+	convertErrorCases := []any{
+		"asdf",
+		"1.1.1.1",
+		"1-1",
+	}
+	for i, c := range convertErrorCases {
+		_, err := any2Float64(c)
+		require.ErrorIs(t, err, valueConvertErr, "case index: %d", i)
+	}
+	unexpectedValueTypeErrorCases := []any{
+		os.File{},
+		strings.Builder{},
+		time.Time{},
+	}
+	for _, c := range unexpectedValueTypeErrorCases {
+		_, err := any2Float64(c)
+		require.ErrorIs(t, err, unexpectedValueTypeErr)
+	}
+}
+
+func TestAny2Bool(t *testing.T) {
+	successCases := []any{
+		true,
+		"true",
+		"1",
+		"True",
+		"TRUE",
+		"T",
+	}
+	for index, c := range successCases {
+		i, err := any2Bool(c)
+		require.NoError(t, err)
+		require.Equalf(t, true, i, "%d: %+v\n", index, reflect.TypeOf(c))
+	}
+	convertErrorCases := []any{
+		"fALsE",
+		"tRuE",
+		"2",
+	}
+	for i, c := range convertErrorCases {
+		v, err := any2Bool(c)
+		require.ErrorIs(t, err, valueConvertErr, "index: %d, v: %+v", i, v)
+	}
+	unexpectedValueTypeErrorCases := []any{
+		1,
+		int64(1),
+		int32(1),
+		int16(1),
+		int8(1),
+		uint(1),
+		uint64(1),
+		uint32(1),
+		uint16(1),
+		uint8(1),
+		float64(1),
+		float32(1),
+		os.File{},
+		strings.Builder{},
+		time.Time{},
+	}
+	for _, c := range unexpectedValueTypeErrorCases {
+		_, err := any2Bool(c)
+		require.ErrorIs(t, err, unexpectedValueTypeErr)
+	}
+}
+
+func TestAny2Time(t *testing.T) {
+	now := time.Now().UTC()
+	successCases := []any{
+		now,
+		now.Format(time.RFC3339Nano),
+	}
+	for index, c := range successCases {
+		i, err := any2Time(c)
+		require.NoError(t, err)
+		require.Equalf(t, now, i, "%d: %+v\n", index, reflect.TypeOf(c))
+	}
+}
+
+func TestAny2Str(t *testing.T) {
+	successCases := []any{
+		"1",
+		1,
+		int64(1),
+		int32(1),
+		int16(1),
+		int8(1),
+		uint(1),
+		uint64(1),
+		uint32(1),
+		uint16(1),
+		uint8(1),
+		float64(1),
+		float32(1),
+	}
+	for index, c := range successCases {
+		i := any2Str(c)
+		require.Equalf(t, "1", i, "%d: %+v\n", index, reflect.TypeOf(c))
 	}
 }

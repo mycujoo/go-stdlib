@@ -1,6 +1,8 @@
 package kqlfilter
 
 import (
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +34,7 @@ type FilterToSquirrelSqlFieldConfig struct {
 	// A function that takes a string value as provided by the user and converts it to string result that matches how it
 	// should be as users' input. This should return an error when the user is providing a value that is illegal or unexpected
 	// for this particular field. Defaults to using the provided value as-is.
-	MapValue func(string) (string, error)
+	MapValue func(string) (any, error)
 	// A function that handle parsing the sql statement by itself.
 	// If set, all other fields in the config will be ignored
 	CustomBuilder func(stmt sq.SelectBuilder, operator string, values []string) (sq.SelectBuilder, error)
@@ -65,27 +67,6 @@ type FilterToSquirrelSqlFieldConfig struct {
 //
 // ...... WHERE user_id = 123456 AND status in ("active","frozen","deleted") .....
 //
-// To query with Full Test Search, the column type must be FilterToSquirrelSqlFieldColumnTypeString and the Operator must be "=", and the
-// column name should be the corresponding column name in which you store the search tokens
-// For example:
-//
-// Filter:
-//
-//	[(Field: "title", Operator: "=", Values: []string{"Monday Wednesday Sunday"})]
-//
-// ConfigMap:
-//
-//	{ "title": (ColumnName: "title_search_token", ColumnType: FilterToSquirrelSqlFieldColumnTypeString) }
-//
-// This method will do:
-//
-//	stmt = stmt.Where(sq.Expr(columnName+" @@ to_tsquery(?)", search))
-//	return stmt
-//
-// And result:
-//
-//	...... WHERE title_search_token @@ to_tsquery("Monday & Wednesday & Sunday") ......
-//
 // Note: the input timestamp format should always be time.RFC3339Nano
 var unknownFieldErr = errors.Errorf("unknown field")
 
@@ -106,8 +87,6 @@ func (f Filter) ToSquirrelSql(stmt sq.SelectBuilder, fieldConfigs map[string]Fil
 	return stmt, nil
 }
 
-var valueConvertErr = errors.Errorf("value convert error") // used in test cases
-
 func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSqlFieldConfig) (sq.SelectBuilder, error) {
 	var err error
 	// use customer parser if provided
@@ -126,26 +105,30 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	}
 
 	// use MapValue function in config if provided
-	rawValues := c.Values
+	rawValues := make([]any, 0, len(c.Values))
 	if config.MapValue != nil {
-		mappedValues := make([]string, 0, len(rawValues))
+		mappedValues := make([]any, 0, len(rawValues))
 		for i := range c.Values {
-			mappedValue, err := config.MapValue(rawValues[i])
+			mappedValue, err := config.MapValue(c.Values[i])
 			if err != nil {
 				return stmt, err
 			}
 			mappedValues = append(mappedValues, mappedValue)
 		}
 		rawValues = mappedValues
+	} else {
+		for i := range c.Values {
+			rawValues = append(rawValues, c.Values[i])
+		}
 	}
 
 	switch config.ColumnType {
 	case FilterToSquirrelSqlFieldColumnTypeInt:
 		nativeValues := make([]int64, 0, len(rawValues))
 		for i, v := range rawValues {
-			nativeValue, err := strconv.ParseInt(v, 10, 64)
+			nativeValue, err := any2Int64(v)
 			if err != nil {
-				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to int64", v, i)
+				return stmt, errors.Wrapf(err, "failed to convert value %+v at index %d to int64", v, i)
 			}
 			nativeValues = append(nativeValues, nativeValue)
 		}
@@ -153,7 +136,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	case FilterToSquirrelSqlFieldColumnTypeFloat:
 		nativeValues := make([]float64, 0, len(rawValues))
 		for i, v := range rawValues {
-			nativeValue, err := strconv.ParseFloat(v, 64)
+			nativeValue, err := any2Float64(v)
 			if err != nil {
 				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to float64", v, i)
 			}
@@ -163,7 +146,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	case FilterToSquirrelSqlFieldColumnTypeBool:
 		nativeValues := make([]bool, 0, len(rawValues))
 		for i, v := range rawValues {
-			nativeValue, err := strconv.ParseBool(v)
+			nativeValue, err := any2Bool(v)
 			if err != nil {
 				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to bool", v, i)
 			}
@@ -173,7 +156,7 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 	case FilterToSquirrelSqlFieldColumnTypeTimestamp:
 		nativeValues := make([]time.Time, 0, len(rawValues))
 		for i, v := range rawValues {
-			nativeValue, err := time.Parse(time.RFC3339Nano, v)
+			nativeValue, err := any2Time(v)
 			if err != nil {
 				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to time.Time", v, i)
 			}
@@ -181,7 +164,15 @@ func (c *Clause) ToSquirrelSql(stmt sq.SelectBuilder, config FilterToSquirrelSql
 		}
 		stmt, err = buildStmtByOperator[time.Time](stmt, columnName, c.Operator, nativeValues, config)
 	default:
-		stmt, err = buildStmtByOperator[string](stmt, columnName, c.Operator, rawValues, config)
+		nativeValues := make([]string, 0, len(rawValues))
+		for i, v := range rawValues {
+			nativeValue := any2Str(v)
+			if err != nil {
+				return stmt, errors.Wrapf(valueConvertErr, "failed to convert value %s (index %d in filter c values) to time.Time", v, i)
+			}
+			nativeValues = append(nativeValues, nativeValue)
+		}
+		stmt, err = buildStmtByOperator[string](stmt, columnName, c.Operator, nativeValues, config)
 	}
 
 	if err != nil {
@@ -232,4 +223,151 @@ func buildStmtByOperator[T string | int64 | float64 | bool | time.Time](stmt sq.
 		return stmt, errors.Wrapf(operatorError, "unsupported operator %s", op)
 	}
 	return stmt, nil
+}
+
+var valueConvertErr = errors.Errorf("value convert error") // used in test cases
+var unexpectedValueTypeErr = errors.Errorf("unexpected value type")
+
+func any2Int64(input any) (int64, error) {
+	switch val := input.(type) {
+	case string:
+		result, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+
+			return result, errors.Wrapf(valueConvertErr, "failed to convert value %s to int64", val)
+		}
+		return result, nil
+	case int:
+		return int64(val), nil
+	case int64:
+		return val, nil
+	case int32:
+		return int64(val), nil
+	case int16:
+		return int64(val), nil
+	case int8:
+		return int64(val), nil
+	case uint:
+		return int64(val), nil
+	case uint64:
+		return int64(val), nil
+	case uint32:
+		return int64(val), nil
+	case uint16:
+		return int64(val), nil
+	case uint8:
+		return int64(val), nil
+	case float64:
+		return int64(val), nil
+	case float32:
+		return int64(val), nil
+	default:
+		return 0, errors.Wrapf(unexpectedValueTypeErr, "value %+v type %+v doesn't support to be converted to int64", input, reflect.TypeOf(input))
+	}
+}
+
+func any2Float64(input any) (float64, error) {
+	switch val := input.(type) {
+	case string:
+		result, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return result, errors.Wrapf(valueConvertErr, "failed to convert value %s to float64", val)
+		}
+		return result, nil
+	case int:
+		return float64(val), nil
+	case int64:
+		return float64(val), nil
+	case int32:
+		return float64(val), nil
+	case int16:
+		return float64(val), nil
+	case int8:
+		return float64(val), nil
+	case uint:
+		return float64(val), nil
+	case uint64:
+		return float64(val), nil
+	case uint32:
+		return float64(val), nil
+	case uint16:
+		return float64(val), nil
+	case uint8:
+		return float64(val), nil
+	case float64:
+		return val, nil
+	case float32:
+		return float64(val), nil
+	default:
+		return 0, errors.Wrapf(unexpectedValueTypeErr, "value %+v type %+v doesn't support to be converted to float64", input, reflect.TypeOf(input))
+	}
+}
+
+func any2Bool(input any) (bool, error) {
+	switch val := input.(type) {
+	case bool:
+		return val, nil
+	case string:
+		result, err := strconv.ParseBool(val)
+		if err != nil {
+			return result, errors.Wrapf(valueConvertErr, "failed to convert value %s to bool", val)
+		}
+		return result, nil
+	default:
+		return false, errors.Wrapf(unexpectedValueTypeErr, "value %+v type %+v doesn't support to be converted to bool", input, reflect.TypeOf(input))
+	}
+}
+
+func any2Time(input any) (time.Time, error) {
+	switch val := input.(type) {
+	case time.Time:
+		return val, nil
+	case string:
+		result, err := time.Parse(time.RFC3339Nano, val)
+		if err != nil {
+			return result, errors.Wrapf(valueConvertErr, "failed to convert value %s to time.Time", val)
+		}
+		return result, nil
+	default:
+		return time.Time{}, errors.Wrapf(unexpectedValueTypeErr, "value %+v type %+v doesn't support to be converted to bool", input, reflect.TypeOf(input))
+	}
+}
+
+func any2Str(input any) string {
+	switch val := input.(type) {
+	case string:
+		return val
+	case []byte:
+		return string(val)
+	case int:
+		return strconv.FormatInt(int64(val), 10)
+	case int64:
+		return strconv.FormatInt(val, 10)
+	case int32:
+		return strconv.FormatInt(int64(val), 10)
+	case int16:
+		return strconv.FormatInt(int64(val), 10)
+	case int8:
+		return strconv.FormatInt(int64(val), 10)
+	case uint:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint64:
+		return strconv.FormatUint(val, 10)
+	case uint32:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(val), 10)
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(val)
+	case fmt.Stringer:
+		return val.String()
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }
