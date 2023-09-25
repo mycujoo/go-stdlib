@@ -134,12 +134,11 @@ func (f FilterToSpannerFieldConfig) mapValues(values []string) (any, error) {
 func (f FilterToSpannerFieldConfig) convertValue(value string) (any, error) {
 	switch f.ColumnType {
 	case FilterToSpannerFieldColumnTypeInt64:
-		intVal, err := strconv.Atoi(value)
+		intVal, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid INT64 value: %w", err)
 		}
-		// convert to int64 since int is not supported by spanner client
-		return int64(intVal), nil
+		return intVal, nil
 
 	case FilterToSpannerFieldColumnTypeFloat64:
 
@@ -275,8 +274,12 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 			mappedString, isString := mappedValue.(string)
 			if fieldConfig.AllowPrefixMatch && isString && strings.HasSuffix(mappedString, "*") && !strings.HasSuffix(mappedString, "\\*") {
 				operator = " LIKE "
+				// escape all instances of \ in the string
+				mappedString = strings.ReplaceAll(mappedString, `\`, `\\`)
+				// escape all instances of _ in the string
+				mappedString = strings.ReplaceAll(mappedString, `_`, `\_`)
 				// escape all instances of % in the string
-				mappedString = strings.ReplaceAll(mappedString, "%", "\\%")
+				mappedString = strings.ReplaceAll(mappedString, `%`, `\%`)
 				// replace the trailing * with a %
 				mappedValue = mappedString[0:len(mappedString)-1] + "%"
 				break
@@ -319,7 +322,7 @@ func parseAnyToSlice[T any](s any) ([]T, error) {
 		for i := range sVal {
 			typeVal, ok := sVal[i].(T)
 			if !ok {
-				return nil, fmt.Errorf("values' type in any slice doesn't match the expectation")
+				return nil, fmt.Errorf("values' type in any slice doesn't match the expectation, value type: [%+v], expect: [%+v]", reflect.TypeOf(sVal[i]), reflect.TypeOf(*new(T)))
 			}
 			typeSlice = append(typeSlice, typeVal)
 		}
