@@ -166,9 +166,9 @@ func (q *QueryGenerator) convertNodeToQuery(node kqlfilter.Node, prefix string) 
 func convertRangeNode(op kqlfilter.RangeOperator, lit *kqlfilter.LiteralNode) (types.RangeQuery, error) {
 	// Here we check the type of the literal node, and then we can create the correct range query.
 	fVal, err := strconv.ParseFloat(lit.Value, 64)
-	esFVal := types.Float64(fVal)
 	if err == nil {
 		// it is an int
+		esFVal := types.Float64(fVal)
 		rq := &types.NumberRangeQuery{}
 		switch op {
 		case kqlfilter.RangeOperatorLt:
