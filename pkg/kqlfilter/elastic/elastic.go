@@ -186,7 +186,7 @@ func convertRangeNode(op kqlfilter.RangeOperator, lit *kqlfilter.LiteralNode) (t
 	// It is not a number, so we check if it is a date.
 	_, err = time.Parse(time.RFC3339, lit.Value)
 	if err != nil {
-		return nil, errors.New("expected int or date literal")
+		return nil, errors.New("expected number or date literal")
 	}
 
 	rq := &types.DateRangeQuery{}
