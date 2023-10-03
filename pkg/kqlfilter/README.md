@@ -1,4 +1,5 @@
 # KQL filter package
+[![GoDoc][godoc:image]][godoc:url]
 
 This package contains Kibana Query Language parser.
 
@@ -50,3 +51,6 @@ func main() {
     fmt.Println(ast)
 }
 ```
+
+[godoc:image]:  https://godoc.org/github.com/mycujoo/go-stdlib/pkg/kqlfilter?status.svg
+[godoc:url]:    https://godoc.org/github.com/mycujoo/go-stdlib/pkg/kqlfilter

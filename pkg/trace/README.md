@@ -1,4 +1,5 @@
 # Trace package
+[![GoDoc][godoc:image]][godoc:url]
 
 This package contains shared initialization code that exports collected spans via otlp exporter.
 
@@ -148,3 +149,6 @@ func (c *consumer) processMessage(ctx context.Context, msg *kafkaavro.Message) {
 	}
 }
 ```
+
+[godoc:image]:  https://godoc.org/github.com/mycujoo/go-stdlib/pkg/trace?status.svg
+[godoc:url]:    https://godoc.org/github.com/mycujoo/go-stdlib/pkg/trace
