@@ -285,11 +285,6 @@ func (f Filter) ToSpannerSQL(fieldConfigs map[string]FilterToSpannerFieldConfig)
 				break
 			}
 
-			if fieldConfig.ColumnType == FilterToSpannerFieldColumnTypeBool {
-				operator = " IS "
-				break
-			}
-
 		case ">=", "<=", ">", "<":
 			switch fieldConfig.ColumnType {
 			case FilterToSpannerFieldColumnTypeInt64, FilterToSpannerFieldColumnTypeFloat64, FilterToSpannerFieldColumnTypeTimestamp:
