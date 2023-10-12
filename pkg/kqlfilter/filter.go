@@ -9,6 +9,22 @@ type Filter struct {
 	Clauses []Clause
 }
 
+type NodeTransformer struct {
+	transformIdentifierFunc func(string) string
+	transformValueFunc      func(string) string
+}
+
+func NewNodeTransformer() NodeTransformer {
+	return NodeTransformer{
+		transformIdentifierFunc: func(s string) string {
+			return s
+		},
+		transformValueFunc: func(s string) string {
+			return s
+		},
+	}
+}
+
 type Clause struct {
 	Field string
 	// One of the following: `=`, `<`, `<=`, `>`, `>=`, `IN`
@@ -53,6 +69,48 @@ func ParseAST(input string, options ...ParserOption) (n Node, err error) {
 	p.lex = nil // release lexer for garbage collection
 
 	return p.Root, err
+}
+
+func TestTransformFunc(ast Node, transformer NodeTransformer) error {
+	switch x := ast.(type) {
+	case *AndNode:
+		for _, n := range x.Nodes {
+			err := TestTransformFunc(n, transformer)
+			if err != nil {
+				return err
+			}
+		}
+	case *OrNode:
+		for _, n := range x.Nodes {
+			err := TestTransformFunc(n, transformer)
+			if err != nil {
+				return err
+			}
+		}
+	case *IsNode:
+		x.Identifier = transformer.transformIdentifierFunc(x.Identifier)
+
+		err := TestTransformFunc(x.Value, transformer)
+		if err != nil {
+			return err
+		}
+	case *NotNode:
+		err := TestTransformFunc(x.Expr, transformer)
+		if err != nil {
+			return err
+		}
+	case *RangeNode:
+		x.Identifier = transformer.transformIdentifierFunc(x.Identifier)
+
+		err := TestTransformFunc(x.Value, transformer)
+		if err != nil {
+			return err
+		}
+	case *LiteralNode:
+		x.Value = transformer.transformValueFunc(x.Value)
+	}
+
+	return nil
 }
 
 // ParserOption is a function that configures a parser.
