@@ -1,12 +1,12 @@
 package kqlfilter
 
-type NodeTransformer struct {
+type NodeMapper struct {
 	TransformIdentifierFunc func(string) string
 	TransformValueFunc      func(string) string
 }
 
-func NewNodeTransformer() NodeTransformer {
-	return NodeTransformer{
+func NewNodeMapper() NodeMapper {
+	return NodeMapper{
 		TransformIdentifierFunc: func(s string) string {
 			return s
 		},
@@ -16,43 +16,43 @@ func NewNodeTransformer() NodeTransformer {
 	}
 }
 
-func TransformAST(ast Node, transformer NodeTransformer) error {
+func (m NodeMapper) Map(ast Node) error {
 	switch x := ast.(type) {
 	case *AndNode:
 		for _, n := range x.Nodes {
-			err := TransformAST(n, transformer)
+			err := m.Map(n)
 			if err != nil {
 				return err
 			}
 		}
 	case *OrNode:
 		for _, n := range x.Nodes {
-			err := TransformAST(n, transformer)
+			err := m.Map(n)
 			if err != nil {
 				return err
 			}
 		}
 	case *IsNode:
-		x.Identifier = transformer.TransformIdentifierFunc(x.Identifier)
+		x.Identifier = m.TransformIdentifierFunc(x.Identifier)
 
-		err := TransformAST(x.Value, transformer)
+		err := m.Map(x.Value)
 		if err != nil {
 			return err
 		}
 	case *NotNode:
-		err := TransformAST(x.Expr, transformer)
+		err := m.Map(x.Expr)
 		if err != nil {
 			return err
 		}
 	case *RangeNode:
-		x.Identifier = transformer.TransformIdentifierFunc(x.Identifier)
+		x.Identifier = m.TransformIdentifierFunc(x.Identifier)
 
-		err := TransformAST(x.Value, transformer)
+		err := m.Map(x.Value)
 		if err != nil {
 			return err
 		}
 	case *LiteralNode:
-		x.Value = transformer.TransformValueFunc(x.Value)
+		x.Value = m.TransformValueFunc(x.Value)
 	}
 
 	return nil

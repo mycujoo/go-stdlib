@@ -6,7 +6,7 @@ import (
 )
 
 func TestNodeTransformer(t *testing.T) {
-	transformer := NewNodeTransformer()
+	transformer := NewNodeMapper()
 	transformer.TransformIdentifierFunc = func(s string) string {
 		if s == "a" {
 			return "z"
@@ -28,7 +28,7 @@ func TestNodeTransformer(t *testing.T) {
 	n, err := ParseAST("a:1 and b:2 and c:3 and d:4 e:6")
 	require.NoError(t, err)
 
-	err = TransformAST(n, transformer)
+	err = transformer.Map(n)
 	require.NoError(t, err)
 
 	require.Equal(t, "((z=1 AND b=2 AND y=99 AND d=4) AND e=6)", n.String())
@@ -36,7 +36,7 @@ func TestNodeTransformer(t *testing.T) {
 	n, err = ParseAST("a:1 and b:2 and not c:3 and d:4 e:6")
 	require.NoError(t, err)
 
-	err = TransformAST(n, transformer)
+	err = transformer.Map(n)
 	require.NoError(t, err)
 
 	require.Equal(t, "((z=1 AND b=2 AND NOT y=99 AND d=4) AND e=6)", n.String())
@@ -44,7 +44,7 @@ func TestNodeTransformer(t *testing.T) {
 	n, err = ParseAST("a>1 and b:2 and not c<3 and d:4 e:6")
 	require.NoError(t, err)
 
-	err = TransformAST(n, transformer)
+	err = transformer.Map(n)
 	require.NoError(t, err)
 
 	require.Equal(t, "((z>1 AND b=2 AND NOT y<99 AND d=4) AND e=6)", n.String())
