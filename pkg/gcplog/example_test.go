@@ -10,10 +10,9 @@ import (
 
 func ExampleNewAutoHandler() {
 	h := gcplog.NewAutoHandler(os.Stderr, &gcplog.HandlerOptions{
-		AddSource:      true,
-		ServiceName:    "some-service",
-		ServiceVersion: "GITSHA",
-		ReportErrors:   true,
+		AddSource:    true,
+		ServiceName:  "some-service",
+		ReportErrors: true,
 	})
 
 	err := fmt.Errorf("storage.Get: %w", os.ErrNotExist)

@@ -24,7 +24,6 @@ func main() {
     h := gcplog.NewAutoHandler(os.Stderr, &gcplog.HandlerOptions{
         AddSource:      true,
         ServiceName:    "some-service",
-        ServiceVersion: "GITSHA",
         ReportErrors:   true,
     })
     
@@ -34,6 +33,12 @@ func main() {
     logger.Error("operation failed", gcplog.Error(err))
 }
 ```
+
+To automatically set your service version during build you can use following command:
+```shell
+go build -ldflags "-X github.com/mycujoo/go-stdlib/pkg/gcplog.serviceVersion=$(git rev-parse HEAD)" -o ./bin/server ./cmd/server
+```
+Or something similar.
 
 It is based on [slogdriver][slogdriver:url] package, but has some changes:
 

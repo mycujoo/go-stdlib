@@ -31,6 +31,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// Value for this variable can be set during build.
+// go build -ldflags "-X github.com/mycujoo/go-stdlib/pkg/gcplog.serviceVersion=$(git rev-parse HEAD)" -o ./bin/server ./cmd/server
+var serviceVersion = ""
+
 type HandlerOptions struct {
 	// AddSource causes the handler to compute the source code position
 	// of the log statement and add a SourceKey attribute to the output.
@@ -68,6 +72,10 @@ func NewAutoHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
 	if opts.GCPProjectID == "" {
 		// Detect project ID
 		opts.GCPProjectID, _ = metadata.ProjectID()
+	}
+	if opts.ServiceVersion == "" {
+		// If service version is not set, use the value provided during linking
+		opts.ServiceVersion = serviceVersion
 	}
 	return NewHandler(w, opts)
 }
