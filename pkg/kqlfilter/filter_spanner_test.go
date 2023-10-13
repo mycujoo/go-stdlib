@@ -264,7 +264,7 @@ func TestToSpannerSQL(t *testing.T) {
 				"exact": {ColumnType: FilterToSpannerFieldColumnTypeBool},
 			},
 			false,
-			"(lat=@KQL0 AND lon=@KQL1 AND exact IS @KQL2)",
+			"(lat=@KQL0 AND lon=@KQL1 AND exact=@KQL2)",
 			map[string]any{
 				"KQL0": 52.4052963,
 				"KQL1": 4.8856547,
@@ -284,7 +284,7 @@ func TestToSpannerSQL(t *testing.T) {
 				},
 			},
 			false,
-			"(truthy IS @KQL0 AND falsey IS @KQL1 AND alsoTruthy IS @KQL2)",
+			"(truthy=@KQL0 AND falsey=@KQL1 AND alsoTruthy=@KQL2)",
 			map[string]any{
 				"KQL0": true,
 				"KQL1": false,
