@@ -22,6 +22,9 @@ var (
 func AddArgs(ctx context.Context, args ...any) {
 	l, ok := ctx.Value(ctxMarkerKey).(*ctxLogger)
 	if !ok || l == nil {
+		// Trying to add args to a context that doesn't have a logger.
+		// We log this to the default logger.
+		slog.Default().Warn("trying to add args to a context that doesn't have a logger")
 		return
 	}
 	l.args = append(l.args, args...)
