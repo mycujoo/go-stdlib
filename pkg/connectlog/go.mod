@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	connectrpc.com/connect v1.11.1
-	github.com/mycujoo/go-stdlib/pkg/ctxslog v0.0.0
+	github.com/mycujoo/go-stdlib/pkg/ctxslog v1.0.0
 )
 
 replace github.com/mycujoo/go-stdlib/pkg/ctxslog => ../ctxslog
