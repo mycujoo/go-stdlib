@@ -24,7 +24,7 @@ func NewLoggingInterceptor(logger *slog.Logger, opts ...Option) connect.UnaryInt
 
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, request connect.AnyRequest) (connect.AnyResponse, error) {
-			l := logger.With(methodFields(request)...)
+			l := logger.With(methodFields(request.Spec())...)
 
 			// Inject logger into context
 			ctx = ctxslog.ToContext(ctx, l)
@@ -101,8 +101,8 @@ func codeToLevel(code connect.Code) slog.Level {
 	}
 }
 
-func methodFields(request connect.AnyRequest) []any {
-	name := strings.TrimLeft(request.Spec().Procedure, "/")
+func methodFields(spec connect.Spec) []any {
+	name := strings.TrimLeft(spec.Procedure, "/")
 	parts := strings.SplitN(name, "/", 2)
 	var fields []any
 	switch len(parts) {
@@ -128,7 +128,16 @@ func methodFields(request connect.AnyRequest) []any {
 // NewLoggingRecoverHandler returns a recover handler that logs panics.
 func NewLoggingRecoverHandler(logger *slog.Logger) func(context.Context, connect.Spec, http.Header, any) error {
 	return func(ctx context.Context, spec connect.Spec, header http.Header, val any) error {
-		logger.ErrorContext(ctx, "handler panic", slog.String("method", spec.Procedure), slog.Any("headers", header), slog.Any("val", val))
+		// remove authorization header from logs
+		header.Del("authorization")
+		attrs := append(methodFields(spec),
+			slog.Any("headers", header),
+			slog.Any("val", val),
+		)
+		logger.ErrorContext(ctx,
+			"handler panic",
+			attrs,
+		)
 		return connect.NewError(connect.CodeInternal, errInternal)
 	}
 }
