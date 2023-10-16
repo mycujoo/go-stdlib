@@ -1,7 +1,3 @@
-buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.1-20230726230109-bf1eaaff2a44.1 h1:6ffu/NQIUjPTD0o71hiUdkF53+P77D5jT01JE98E72w=
-buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.1-20230726230109-bf1eaaff2a44.1/go.mod h1:0US1BDF1xdSfZjfuo9UITzMCCNnJxvvtEpRwcrY8kVE=
-buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1 h1:NmZA1X/FWAyvcZtcQ2UcCwaeE7LtDbLxjqqMf9G2qvE=
-buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1/go.mod h1:mEpu8C3+7iXJhc3ajuUwWLB8FLrhyu9nzdcMqq5ZsXM=
 connectrpc.com/connect v1.11.1 h1:dqRwblixqkVh+OFBOOL1yIf1jS/yP0MSJLijRj29bFg=
 connectrpc.com/connect v1.11.1/go.mod h1:3AGaO6RRGMx5IKFfqbe3hvK1NqLosFNP2BxDYTPmNPo=
 connectrpc.com/otelconnect v0.6.0 h1:VJAdQL9+sgdUw9+7+J+jq8pQo/h1S7tSFv2+vDcR7bU=

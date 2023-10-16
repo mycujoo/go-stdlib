@@ -22,8 +22,10 @@ func GetHandlerOptions(logger *slog.Logger) []connect.HandlerOption {
 				otelconnect.WithoutMetrics(),
 				otelconnect.WithoutServerPeerAttributes(),
 			),
-			connectlog.NewLoggingInterceptor(logger),
 		),
 		connect.WithRecover(connectlog.NewLoggingRecoverHandler(logger)),
+		// We log after recover so panic logs are not duplicated.
+		// Internally, `connect.WithRecover` is adding interceptor.
+		connect.WithInterceptors(connectlog.NewLoggingInterceptor(logger)),
 	}
 }
