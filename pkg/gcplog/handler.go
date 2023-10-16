@@ -31,6 +31,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	otelSvcNameKey    = "OTEL_SERVICE_NAME"
+	svcNameKey        = "GCPLOG_SERVICE_NAME"
+	otelSvcVersionKey = "OTEL_SERVICE_VERSION"
+	svcVersionKey     = "GCPLOG_SERVICE_VERSION"
+)
+
 // Value for this variable can be set during build.
 // go build -ldflags "-X github.com/mycujoo/go-stdlib/pkg/gcplog.serviceVersion=$(git rev-parse HEAD)" -o ./bin/server ./cmd/server
 var serviceVersion = ""
@@ -73,11 +80,41 @@ func NewAutoHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
 		// Detect project ID
 		opts.GCPProjectID, _ = metadata.ProjectID()
 	}
+	if opts.ServiceName == "" {
+		// Detect service name
+		opts.ServiceName = detectServiceName()
+	}
 	if opts.ServiceVersion == "" {
-		// If service version is not set, use the value provided during linking
-		opts.ServiceVersion = serviceVersion
+		opts.ServiceVersion = detectServiceVersion()
 	}
 	return NewHandler(w, opts)
+}
+
+func detectServiceName() string {
+	// check GCPLOG_SERVICE_NAME
+	sn := os.Getenv(svcNameKey)
+	if sn != "" {
+		return sn
+	}
+	// Fallback to OTEL_SERVICE_NAME
+	return os.Getenv(otelSvcNameKey)
+}
+
+func detectServiceVersion() string {
+	// If service version is not set, use the value provided during linking
+	sv := serviceVersion
+	// We ignore the inspection because variable can be set by linker
+	//goland:noinspection GoBoolExpressions
+	if sv != "" {
+		return sv
+	}
+	// Check GCPLOG_SERVICE_VERSION
+	sv = os.Getenv(svcVersionKey)
+	if sv != "" {
+		return sv
+	}
+	// Fallback to OTEL_SERVICE_VERSION
+	return os.Getenv(otelSvcVersionKey)
 }
 
 // NewHandler returns slog.Handler that writes to w using GCP structured logging format.

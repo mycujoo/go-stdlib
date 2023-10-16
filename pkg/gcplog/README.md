@@ -34,11 +34,14 @@ func main() {
 }
 ```
 
+Service name can be set through options or from environment variable `GCPLOG_SERVICE_NAME`.
+Fallback to `OTEL_SERVICE_NAME` is supported.
+
 To automatically set your service version during build you can use following command:
 ```shell
 go build -ldflags "-X github.com/mycujoo/go-stdlib/pkg/gcplog.serviceVersion=$(git rev-parse HEAD)" -o ./bin/server ./cmd/server
 ```
-Or something similar.
+Alternatively you can set `GCPLOG_SERVICE_VERSION` environment variable.
 
 It is based on [slogdriver][slogdriver:url] package, but has some changes:
 
