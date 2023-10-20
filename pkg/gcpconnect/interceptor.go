@@ -10,12 +10,20 @@ import (
 )
 
 // GetHandlerOptions returns the default options for a connect.Handler.
-func GetHandlerOptions(logger *slog.Logger) []connect.HandlerOption {
-	return []connect.HandlerOption{
-		connect.WithCodec(&protoJSONCodec{marshalOptions: protojson.MarshalOptions{
+func GetHandlerOptions(logger *slog.Logger, opts ...Option) []connect.HandlerOption {
+	o := options{
+		// Default marshal options
+		marshalOptions: protojson.MarshalOptions{
 			// Fill unpopulated fields with their default values
 			EmitUnpopulated: true,
-		}}),
+		},
+	}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	return []connect.HandlerOption{
+		connect.WithCodec(NewJSONCodec(o.marshalOptions)),
 		connect.WithInterceptors(
 			// Disable metrics since they are producing a lot of data
 			otelconnect.NewInterceptor(
@@ -26,6 +34,6 @@ func GetHandlerOptions(logger *slog.Logger) []connect.HandlerOption {
 		connect.WithRecover(connectlog.NewLoggingRecoverHandler(logger)),
 		// We log after recover so panic logs are not duplicated.
 		// Internally, `connect.WithRecover` is adding interceptor.
-		connect.WithInterceptors(connectlog.NewLoggingInterceptor(logger)),
+		connect.WithInterceptors(connectlog.NewLoggingInterceptor(logger, o.logOptions...)),
 	}
 }
