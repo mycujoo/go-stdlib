@@ -18,6 +18,13 @@ type protoJSONCodec struct {
 	marshalOptions protojson.MarshalOptions
 }
 
+func NewJSONCodec(opts protojson.MarshalOptions) connect.Codec {
+	return &protoJSONCodec{
+		name:           "json",
+		marshalOptions: opts,
+	}
+}
+
 var _ connect.Codec = (*protoJSONCodec)(nil)
 
 func (c *protoJSONCodec) Name() string { return c.name }
