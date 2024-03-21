@@ -12,10 +12,13 @@ import (
 // NewServer creates a new HTTP server.
 // It contains a healthz endpoint and a handler for the given path.
 // Healthz will return 200 OK if the given context is not done.
-func NewServer(ctx context.Context, addr string, path string, handler http.Handler) (*http.Server, error) {
+func NewServer(ctx context.Context, addr string, options ...NewServerMuxOption) (*http.Server, error) {
 	mux := http.NewServeMux()
 
-	mux.Handle(path, handler)
+	for i := range options {
+		options[i](mux)
+	}
+
 	mux.HandleFunc("/healthz", healthZHandleFunc(ctx))
 
 	srv := &http.Server{
@@ -32,6 +35,20 @@ func NewServer(ctx context.Context, addr string, path string, handler http.Handl
 	}
 
 	return srv, nil
+}
+
+type NewServerMuxOption func(mux *http.ServeMux)
+
+func WithHandler(path string, handler http.Handler) NewServerMuxOption {
+	return func(mux *http.ServeMux) {
+		mux.Handle(path, handler)
+	}
+}
+
+func WithHandleFunc(path string, handleFunc http.HandlerFunc) NewServerMuxOption {
+	return func(mux *http.ServeMux) {
+		mux.HandleFunc(path, handleFunc)
+	}
 }
 
 var (
